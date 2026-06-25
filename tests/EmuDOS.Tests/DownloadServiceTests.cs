@@ -29,7 +29,7 @@ public class DownloadServiceTests
         Assert.Equal("dosbox_pure", asset.Id);
         Assert.Equal(AssetCategory.Core, asset.Category);
         Assert.Equal(DownloadKind.ZippedCore, asset.Kind);
-        Assert.EndsWith("dosbox_pure_libretro.dll.zip", asset.Url);
+        Assert.EndsWith("dosbox_pure_libretro.so.zip", asset.Url); // Linux core (.so, not .dll)
         Assert.Contains(AssetManifest.All, a => a.Id == "dosbox_pure");
     }
 
@@ -37,7 +37,7 @@ public class DownloadServiceTests
     public async Task Downloads_and_extracts_a_zipped_core()
     {
         var dll = new byte[] { 1, 2, 3, 4, 5 };
-        using var http = new HttpClient(new FakeHttpMessageHandler(MakeZip("dosbox_pure_libretro.dll", dll)));
+        using var http = new HttpClient(new FakeHttpMessageHandler(MakeZip("dosbox_pure_libretro.so", dll)));
         var paths = new AppPaths(TempRoot());
         var service = new DownloadService(http, paths);
         var asset = AssetManifest.DosBoxPure;
@@ -48,7 +48,7 @@ public class DownloadServiceTests
 
         Assert.True(result.Success, result.Error);
         Assert.True(service.IsInstalled(asset));
-        Assert.Equal(Path.Combine(paths.CoresDir, "dosbox_pure_libretro.dll"), result.InstalledPath);
+        Assert.Equal(Path.Combine(paths.CoresDir, "dosbox_pure_libretro.so"), result.InstalledPath);
         Assert.Equal(dll, await File.ReadAllBytesAsync(result.InstalledPath!));
         Assert.Equal(Convert.ToHexString(SHA256.HashData(dll)), result.Sha256);
     }

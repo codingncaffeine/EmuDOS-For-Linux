@@ -57,9 +57,11 @@ public static class DosExecutables
             if (target is null)
                 return relPath;
 
-            var dosPath = target.Replace('/', '\\').TrimStart('\\');
+            // Normalise to '/' (which .NET path APIs accept on every OS); a DOS '\' separator isn't
+            // a separator to Path.Combine/GetFileName on Linux, so File lookups below would miss.
+            var dosPath = target.Replace('\\', '/').TrimStart('/');
             if (dosPath.Length > 1 && dosPath[1] == ':')   // strip a drive letter (C:\…)
-                dosPath = dosPath[2..].TrimStart('\\');
+                dosPath = dosPath[2..].TrimStart('/');
 
             if (File.Exists(Path.Combine(contentDir, dosPath)))
                 return relPath; // the hardcoded path is valid here — the .bat is fine
@@ -106,7 +108,7 @@ public static class DosExecutables
         static string Norm(string s) =>
             new(s.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
 
-        var stem = Norm(Path.GetFileNameWithoutExtension(fileName));
+        var stem = Norm(LeafWithoutExtension(fileName));
         if (stem.Length < 2)
             return false;
 
@@ -141,5 +143,10 @@ public static class DosExecutables
     }
 
     private static string Stem(string path) =>
-        Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
+        LeafWithoutExtension(path).ToLowerInvariant();
+
+    // Relative executable paths are DOS-style ("GTADOS\GTA.EXE"). Path.GetFileName* on Linux don't
+    // treat '\' as a separator, so collapse it to '/' before taking the leaf name.
+    private static string LeafWithoutExtension(string path) =>
+        Path.GetFileNameWithoutExtension(path.Replace('\\', '/'));
 }
