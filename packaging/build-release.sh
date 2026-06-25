@@ -25,6 +25,14 @@ if [ ! -f "$PUB/libemudos_mt32.so" ]; then
     cp -f src/native/mt32/libemudos_mt32.so "$PUB/"
 fi
 
+# The librashader runtime (CRT shaders) is fetched + copied by the csproj's FetchAndCopyLibrashader
+# target during publish; double-check it rode along so end users never install a package.
+if [ ! -f "$PUB/librashader.so" ]; then
+    echo "── fetch librashader runtime (was missing from publish)"
+    ( cd src/native/librashader && ./fetch.sh )
+    cp -f src/native/librashader/librashader.so "$PUB/"
+fi
+
 cp packaging/README.txt "$PUB/README.txt"
 cp LICENSE "$PUB/LICENSE"
 cp NOTICES.txt "$PUB/NOTICES.txt"   # LGPL/MPL attribution for bundled/linked components
@@ -71,15 +79,15 @@ Architecture: amd64
 Installed-Size: $INSTALLED_KB
 Depends: libc6, libgcc-s1, libstdc++6, libicu76 | libicu74 | libicu72, libx11-6, libfontconfig1, libegl1, libgl1, libsdl3-0, libpng16-16t64 | libpng16-16
 Recommends: ffmpeg, xorriso, libvlc5, vlc-plugin-base
-Suggests: librashader
 Maintainer: EmuDOS for Linux <stragee@gmail.com>
 Description: A beautiful frontend for your classic DOS games
  Linux port of the EmuDOS frontend: a Boxer-style library manager for classic
  DOS gaming on the DOSBox Pure libretro core. Box art, save states, cheats,
  disc-image mounting, hardware 3dfx, CRT shaders and Roland MT-32 synthesis.
  .
- Install librashader for CRT shaders, ffmpeg for recording, xorriso to build
- disc images, and libvlc for video previews — each degrades gracefully if absent.
+ The librashader CRT-shader runtime ships bundled. Optionally install ffmpeg for
+ recording, xorriso to build disc images, and libvlc for video previews — each
+ feature degrades gracefully if absent.
 CTRL
 dpkg-deb --build --root-owner-group "$DEB" "$OUT/emudos_${VER}_amd64.deb" > /dev/null
 

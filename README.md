@@ -134,7 +134,7 @@ Follows the XDG Base Directory spec:
     library.db
     Cores/                       (DOSBox Pure .so — downloaded in-app)
     Gameboxes/                   (one folder per imported game: content, saves, notes, art)
-    Shaders/                     (CRT slang shaders + librashader runtime — downloaded in-app)
+    Shaders/                     (CRT slang preset pack — downloaded in-app; librashader runtime ships bundled)
     System/                      (Roland MT-32 / CM-32L ROMs)
     Screenshots/ / Recordings/ / Logs/ / ...
 ```
@@ -180,7 +180,7 @@ EmuDOS stands on the work of others, with thanks. **Emulation** is the
 |---|---|---|
 | [Avalonia](https://avaloniaui.net/) | Cross-platform UI (replaces WPF) | MIT |
 | [SDL3](https://www.libsdl.org/) | Audio output + controllers (replaces NAudio/WASAPI + XInput) | Zlib |
-| [librashader](https://github.com/SnowflakePowered/librashader) | runs the slang CRT shaders on the GPU (OpenGL backend) | MPL-2.0 |
+| [librashader](https://github.com/SnowflakePowered/librashader) by [SnowflakePowered](https://github.com/SnowflakePowered) | runs the slang CRT shaders on the GPU (OpenGL backend) — **bundled** with EmuDOS so shaders work out of the box | MPL-2.0 / GPL-3.0 |
 | [libretro slang shaders](https://github.com/libretro/slang-shaders) | the downloadable CRT shader collection | per-shader (see repo) |
 | [LibVLCSharp](https://github.com/videolan/libvlcsharp) | game-card video snaps | LGPL-2.1 |
 | [FFmpeg](https://ffmpeg.org/) | optional gameplay recording | GPL |

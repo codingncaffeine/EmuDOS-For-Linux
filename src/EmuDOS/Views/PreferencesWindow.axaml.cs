@@ -74,12 +74,12 @@ public partial class PreferencesWindow : Window
         var downloadRows = AssetManifest.All
             .Select(a => new DownloadRow(a, _services.Downloads.IsInstalled(a)))
             .ToList();
-        // CRT shaders: the libretro slang preset pack. The librashader GL engine is a system package
-        // (a dependency); F3 in-game cycles the CRT presets once the pack is installed.
+        // CRT shaders: the libretro slang preset pack. The librashader GL engine is bundled with
+        // EmuDOS (next to the binary), so this only downloads the presets; F3 in-game cycles them.
         var paths = _services.Paths;
         downloadRows.Add(new DownloadRow(
             "CRT shaders",
-            "The libretro slang shader collection (CRT, scanlines, monitors). Press F3 in a game to cycle CRT presets. Needs the librashader runtime, a package dependency.",
+            "The libretro slang shader collection (CRT, scanlines, monitors). Press F3 in a game to cycle CRT presets. The shader engine is bundled — no extra install needed.",
             installed: Effects.Librashader.ShaderDownloader.IsInstalled(paths.SlangShaderRoot, paths.LibrashaderDllPath),
             customDownload: report => Effects.Librashader.ShaderDownloader.DownloadAsync(paths.SlangShaderRoot, paths.LibrashaderDllPath, report)));
         DownloadList.ItemsSource = downloadRows;

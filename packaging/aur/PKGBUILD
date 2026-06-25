@@ -14,9 +14,10 @@ provides=('emudos')
 conflicts=('emudos')
 # sdl3 = gamepads. The publish is otherwise self-contained (.NET + the MT-32 shim
 # are bundled). The rest are optional: each feature degrades gracefully when absent.
+# The librashader CRT-shader runtime ships bundled in the tarball (librashader.so), so it is NOT a
+# dependency here.
 depends=('sdl3' 'fontconfig' 'libx11')
-optdepends=('librashader: CRT shaders'
-            'ffmpeg: gameplay recording'
+optdepends=('ffmpeg: gameplay recording'
             'libisoburn: build ISO disc images from a folder (xorriso)'
             'libvlc: video previews')
 options=('!strip')   # self-contained .NET bundle — stripping breaks it
