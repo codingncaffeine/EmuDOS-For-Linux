@@ -212,6 +212,21 @@
     </Setter>
   </ControlTheme>
 
+  <!-- MenuFlyoutPresenter: the popup container for a MenuFlyout (e.g. the detail card's "…" overflow).
+       Matches the ContextMenu card so it isn't Fluent's light popup. -->
+  <ControlTheme x:Key="{x:Type MenuFlyoutPresenter}" TargetType="MenuFlyoutPresenter">
+    <Setter Property="Background" Value="{StaticResource BgSecondary}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{StaticResource BgSecondary}" BorderBrush="{StaticResource BorderNormal}"
+                BorderThickness="1" CornerRadius="4" Padding="3">
+          <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
   <!-- MenuItem: flat dark row, BgTertiary on hover, no icon/checkmark column or submenu arrow. -->
   <ControlTheme x:Key="{x:Type MenuItem}" TargetType="MenuItem">
     <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
