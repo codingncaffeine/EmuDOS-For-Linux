@@ -8,6 +8,10 @@ public enum DownloadKind
 
     /// <summary>A libretro core shipped as a .zip; the contained .dll is extracted.</summary>
     ZippedCore,
+
+    /// <summary>A single executable nested inside a .tar.xz (e.g. BtbN's Linux ffmpeg build). The
+    /// member matching <see cref="DownloadAsset.FileName"/> is extracted and made executable.</summary>
+    TarXzBinary,
 }
 
 /// <summary>Where an asset belongs once installed (drives its target directory).</summary>
