@@ -42,6 +42,8 @@ public partial class App : Application
             await viewModel.ImportPathsAsync(
                 autoImport.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
         }
+        if (Environment.GetEnvironmentVariable("EMUDOS_AUTOPLAY") == "1")
+            await window.PlayFirstAsync();
 
         // Check GitHub for a newer release and surface it in the bottom bar (best-effort, non-blocking).
         _ = viewModel.CheckForUpdatesAsync();
