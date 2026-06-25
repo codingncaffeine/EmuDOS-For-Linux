@@ -1,5 +1,4 @@
 using System.Text;
-using System.Threading;
 using EmuDOS.Core.Import;
 
 namespace EmuDOS.Tests;
@@ -16,8 +15,14 @@ public class IsoBuilderTests
 
         try
         {
-            // IMAPI2 is COM and wants an STA thread, mirroring how the app builds these.
-            BuildOnSta(() => IsoBuilder.BuildFromFolder(src, iso, "TEST DISC"));
+            if (!IsoBuilder.IsAvailable)
+            {
+                // No xorriso/genisoimage/mkisofs on PATH — the builder must fail clearly, not silently.
+                Assert.Throws<NotSupportedException>(() => IsoBuilder.BuildFromFolder(src, iso, "TEST DISC"));
+                return;
+            }
+
+            IsoBuilder.BuildFromFolder(src, iso, "TEST DISC");
 
             Assert.True(File.Exists(iso));
             Assert.True(new FileInfo(iso).Length >= 16 * 2048);
@@ -34,22 +39,5 @@ public class IsoBuilderTests
             try { Directory.Delete(src, recursive: true); } catch { /* best effort */ }
             try { File.Delete(iso); } catch { /* best effort */ }
         }
-    }
-
-    private static void BuildOnSta(Action action)
-    {
-        Exception? error = null;
-        var thread = new Thread(() =>
-        {
-            try { action(); }
-            catch (Exception ex) { error = ex; }
-        });
-#pragma warning disable CA1416 // EmuDOS is Windows-only; STA + IMAPI2 are Windows APIs.
-        thread.SetApartmentState(ApartmentState.STA);
-#pragma warning restore CA1416
-        thread.Start();
-        thread.Join();
-        if (error is not null)
-            throw error;
     }
 }

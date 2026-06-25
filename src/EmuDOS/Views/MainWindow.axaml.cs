@@ -348,6 +348,15 @@ public partial class MainWindow : Window
         menu.Items.Add(Item("✏  Rename from ScreenScraper…", () => RenameFromScreenScraper(tile)));
         menu.Items.Add(Item("📖  Read manual", () => _ = OpenManualAsync(tile)));
 
+        // A disc game can take extra discs — each joins dosbox_pure's start menu to mount as D:.
+        if (IsDiscGame(tile))
+        {
+            var addDisc = new MenuItem { Header = "💿  Add disc" };
+            addDisc.Items.Add(Item("From a disc image…", () => _ = AddDiscFromImagesAsync(tile)));
+            addDisc.Items.Add(Item("From a folder…", () => _ = AddDiscFromFolderAsync(tile)));
+            menu.Items.Add(addDisc);
+        }
+
         menu.Items.Add(new Separator());
         menu.Items.Add(Item("🗑  Delete", () => DeleteGamesConfirmed(new[] { tile })));
 
@@ -356,6 +365,126 @@ public partial class MainWindow : Window
 
     private static MenuItem Item(string header, Action onClick) =>
         new() { Header = header, Command = new RelayAction(onClick) };
+
+    // ── Add disc (extra CDs for a disc game) ─────────────────────────────────────────────────
+    private static readonly string[] DiscExtensions = [".iso", ".cue", ".bin", ".chd"];
+
+    private static bool IsDiscGame(GameTile tile)
+    {
+        var content = Path.Combine(tile.Game.GameboxPath, "content");
+        if (!Directory.Exists(content))
+            return false;
+        try
+        {
+            return Directory.EnumerateFiles(content)
+                .Any(f => DiscExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()));
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Copy chosen disc image(s) into the gamebox content so they join the disc-swap menu.</summary>
+    private async Task AddDiscFromImagesAsync(GameTile tile)
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = $"Add disc(s) to {tile.Title}",
+            AllowMultiple = true,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Disc images") { Patterns = ["*.iso", "*.cue", "*.bin", "*.chd"] },
+                new FilePickerFileType("All files") { Patterns = ["*"] },
+            ],
+        });
+        var paths = files.Select(f => f.TryGetLocalPath()).OfType<string>().ToList();
+        if (paths.Count == 0)
+            return;
+
+        try
+        {
+            var content = Path.Combine(tile.Game.GameboxPath, "content");
+            Directory.CreateDirectory(content);
+
+            // A .bin is mounted via its .cue, so don't double-copy a .bin that a selected .cue brings.
+            var cueBins = paths
+                .Where(f => f.EndsWith(".cue", StringComparison.OrdinalIgnoreCase))
+                .SelectMany(cue => EmuDOS.Core.Import.ImportPipeline.CueReferencedFiles(cue).Select(Path.GetFileName))
+                .OfType<string>()
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            int added = 0;
+            var udf = new List<string>();
+            foreach (var path in paths)
+            {
+                if (path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase) && cueBins.Contains(Path.GetFileName(path)))
+                    continue; // its .cue will copy it
+
+                CopyDiscWithSidecars(path, content);
+                added++;
+                if (path.EndsWith(".iso", StringComparison.OrdinalIgnoreCase) && !EmuDOS.Core.Import.ImportPipeline.IsIso9660(path))
+                    udf.Add(Path.GetFileNameWithoutExtension(path));
+            }
+
+            var msg = $"Added {added} disc{(added == 1 ? "" : "s")} to {tile.Title} — launch it and swap discs from the start menu.";
+            if (udf.Count > 0)
+                msg += $"  ⚠ {string.Join(", ", udf)} isn't a standard ISO9660 CD (e.g. UDF) and likely won't mount.";
+            Vm?.Report(msg, busy: false);
+        }
+        catch (Exception ex)
+        {
+            Vm?.Report($"Couldn't add disc: {ex.Message}", busy: false);
+        }
+    }
+
+    // Copy a disc image into the box; for a .cue, bring the track files it references along.
+    private static void CopyDiscWithSidecars(string source, string content)
+    {
+        File.Copy(source, Path.Combine(content, Path.GetFileName(source)), overwrite: true);
+        if (!source.EndsWith(".cue", StringComparison.OrdinalIgnoreCase))
+            return;
+        var sourceDir = Path.GetDirectoryName(source) ?? string.Empty;
+        foreach (var track in EmuDOS.Core.Import.ImportPipeline.CueReferencedFiles(source))
+        {
+            var trackPath = Path.Combine(sourceDir, track);
+            if (File.Exists(trackPath))
+                File.Copy(trackPath, Path.Combine(content, Path.GetFileName(track)), overwrite: true);
+        }
+    }
+
+    // Build an ISO9660 image from a folder (e.g. files extracted from a rip the emulator can't read,
+    // via xorriso) and attach it as a disc. Useful for getting loose game files onto a mountable disc.
+    private async Task AddDiscFromFolderAsync(GameTile tile)
+    {
+        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = $"Pick a folder to turn into a disc for {tile.Title}",
+            AllowMultiple = false,
+        });
+        if (folders.FirstOrDefault()?.TryGetLocalPath() is not { } folder)
+            return;
+
+        var name = SafeDiscName(Path.GetFileName(folder.TrimEnd('\\', '/')));
+        var content = Path.Combine(tile.Game.GameboxPath, "content");
+        Directory.CreateDirectory(content);
+        var isoPath = Path.Combine(content, name + ".iso");
+
+        Vm?.Report($"Building a disc image from {Path.GetFileName(folder)}… this can take a minute.", busy: true);
+        try
+        {
+            await Task.Run(() => EmuDOS.Core.Import.IsoBuilder.BuildFromFolder(folder, isoPath, name));
+            Vm?.Report($"Added {name}.iso to {tile.Title} — launch it and INSERT the disc from the menu (F10).", busy: false);
+        }
+        catch (Exception ex)
+        {
+            try { if (File.Exists(isoPath)) File.Delete(isoPath); } catch { /* leave a locked partial */ }
+            Vm?.Report($"Couldn't build the disc image: {ex.Message}", busy: false);
+        }
+    }
+
+    private static string SafeDiscName(string raw)
+    {
+        var cleaned = new string(raw.Where(c => !Path.GetInvalidFileNameChars().Contains(c)).ToArray()).Trim();
+        return cleaned.Length == 0 ? "disc" : cleaned;
+    }
 
     private async Task SetCustomArtAsync(GameTile tile)
     {
