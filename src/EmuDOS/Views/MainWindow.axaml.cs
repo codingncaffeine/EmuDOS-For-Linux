@@ -915,10 +915,15 @@ public partial class MainWindow : Window
         if (instance.Profile.SourceMedia != SourceMediaType.Iso)
             ContentBaseline.CaptureIfMissing(instance.ContentPath, instance.SavePath);
 
-        // 3dfx hardware rendering stays software for now — the offscreen EGL path is deferred
-        // (backlog C). The per-game/global 3dfx selection lights up once that lands.
+        // 3dfx: the per-game choice overrides the global default (Default = follow global).
+        bool hw3dfx = instance.Profile.Machine.Hardware3dfx switch
+        {
+            Core.Model.Hardware3dfxMode.On => true,
+            Core.Model.Hardware3dfxMode.Off => false,
+            _ => services.Settings.Hardware3dfx,
+        };
         var engine = new DosBoxPureEngine(
-            services.Downloads.InstalledPath(AssetManifest.DosBoxPure), services.Paths.SystemDir, hardware3dfx: false);
+            services.Downloads.InstalledPath(AssetManifest.DosBoxPure), services.Paths.SystemDir, hw3dfx);
         services.Library.RecordPlay(tile.Id);
         new EmulatorWindow(engine, instance, tile.Id, loadState).Show();
         Vm.ClearStatus();
