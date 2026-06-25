@@ -35,6 +35,24 @@ public sealed class GitHubSyncService
     private static readonly HttpClient Http = CreateClient();
     private static readonly SemaphoreSlim Gate = new(1, 1); // only one sync at a time (launch + manual)
 
+    // Per-host library-DB snapshot name. The DB is whole-file last-writer-wins, and multiple machines
+    // share one saves repo, so a single shared db/library.db.gz lets one box clobber another's library
+    // (lost rows — the hazard that bit Emutastic). Namespacing the snapshot by machine means each box
+    // owns its own and they never overwrite each other. MUST be declared before any member that builds
+    // a path from it (static initializers run in source order; a later-initialized field would read
+    // null and collapse the name to "library..db.gz").
+    private static readonly string MachineSuffix = SanitizeHost(Environment.MachineName);
+    private static readonly string DbRepoPath = $"db/library.{MachineSuffix}.db.gz";
+
+    private static string SanitizeHost(string? host)
+    {
+        if (string.IsNullOrWhiteSpace(host))
+            return "host";
+        var cleaned = new string(host.Trim().ToLowerInvariant()
+            .Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
+        return cleaned.Length == 0 ? "host" : cleaned;
+    }
+
     // The GitHub Contents API rejects large blobs (and a huge base64 string overflows the JSON
     // serializer). Files above this are skipped during sync — mainly OS install .pure.zip overlays.
     private const long MaxUploadBytes = 40L * 1024 * 1024;
@@ -194,7 +212,8 @@ public sealed class GitHubSyncService
             {
                 progress?.Report("Uploading library database…");
                 var dbBytes = ReadShared(dbPath);
-                if (await PutIfChanged("db/library.db.gz", dbBytes, () => Wrap(Gzip(dbBytes))).ConfigureAwait(false))
+                // Per-host path (db/library.<host>.db.gz), NOT a shared db/library.db.gz — see DbRepoPath.
+                if (await PutIfChanged(DbRepoPath, dbBytes, () => Wrap(Gzip(dbBytes))).ConfigureAwait(false))
                 {
                     up++;
                     _log("Uploaded library database.");
