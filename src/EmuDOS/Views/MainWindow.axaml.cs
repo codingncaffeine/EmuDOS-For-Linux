@@ -270,7 +270,7 @@ public partial class MainWindow : Window
 
         var overflow = new List<(string, Action)>
         {
-            ("Manage…", () => ComingSoon("Manage window")),
+            ("Manage…", () => OpenManage(tile)),
             ("Rename from ScreenScraper…", () => RenameFromScreenScraper(tile)),
             ("Cheats… (preview)", () => ComingSoon("Cheats")),
             ("Game preferences…", () => ComingSoon("Game preferences")),
@@ -308,7 +308,7 @@ public partial class MainWindow : Window
 
         menu.Items.Add(new Separator());
         menu.Items.Add(Item("⚙  Preferences", () => ComingSoon("Game preferences")));
-        menu.Items.Add(Item("🛠  Manage…", () => ComingSoon("Manage window")));
+        menu.Items.Add(Item("🛠  Manage…", () => OpenManage(tile)));
         menu.Items.Add(Item("📂  Open game folder", () =>
         {
             try { Process.Start(new ProcessStartInfo(tile.Game.GameboxPath) { UseShellExecute = true }); }
@@ -449,6 +449,18 @@ public partial class MainWindow : Window
         Vm?.Report(
             args is null ? $"Cleared launch parameters for {tile.Title}." : $"Launch parameters set: {args}",
             busy: false);
+    }
+
+    /// <summary>Open the per-game Manage window (save states, media, extras, notes, display). If the
+    /// user picks "Load" on a save state, launch the game restored to it once the window closes.</summary>
+    private async void OpenManage(GameTile tile)
+    {
+        _openCard?.Close();
+        var game = Services.Library.GetGame(tile.Id) ?? tile.Game;
+        var manage = new ManageGameWindow(Services, game);
+        await manage.ShowDialog(this);
+        if (manage.StateToLaunch is { } st && Core.Library.SaveStateStore.ReadState(st) is { } data)
+            await LaunchGameAsync(tile, loadState: data);
     }
 
     // ── Smart executable picker (Choose program…) ────────────────────────────────────────────
