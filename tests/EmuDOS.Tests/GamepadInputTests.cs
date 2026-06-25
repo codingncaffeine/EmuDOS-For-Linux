@@ -31,4 +31,31 @@ public class GamepadInputTests
         if (sdlPresent)
             Assert.True(pad.Available, "libSDL3 is installed but the SDL3 gamepad backend failed to initialise.");
     }
+
+    [Fact]
+    public void Factory_backend_is_available_on_linux_with_sdl3()
+    {
+        // The status-bar ControllerMonitor only polls when its backend reports Available. Regression
+        // guard: on Linux (no XInput) the factory must fall through to SDL3 and be Available where the
+        // library is present — otherwise controller connect/disconnect is never announced. SDL3's
+        // built-in database covers Xbox, DualSense, DualShock, Switch Pro, 8BitDo and many more.
+        bool sdlPresent = File.Exists("/usr/lib/libSDL3.so.0") || File.Exists("/usr/lib/libSDL3.so")
+                          || File.Exists("/usr/lib64/libSDL3.so.0");
+        if (!sdlPresent || OperatingSystem.IsWindows())
+            return; // nothing to assert without SDL3 / on the XInput platform
+
+        var pad = GamepadInput.Create();
+        Assert.True(pad.Available,
+            "On Linux with SDL3 installed, GamepadInput.Create() must return an Available backend so the "
+            + "controller monitor actually runs.");
+    }
+
+    [Fact]
+    public void ControllerMonitor_start_and_dispose_are_safe()
+    {
+        // Constructs the real monitor (cross-platform backend) and exercises its lifecycle — this would
+        // have been a silent no-op back when it was hardcoded to the Windows-only XInput on Linux.
+        using var monitor = new ControllerMonitor(coresDir: null!);
+        monitor.Start();
+    }
 }
