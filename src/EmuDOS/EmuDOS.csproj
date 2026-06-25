@@ -14,7 +14,7 @@
     <ApplicationIcon>Assets\EmuDOS.ico</ApplicationIcon>
     <!-- The Linux port's own release line (pre-1.0 while features stabilize against upstream).
          Surfaced in Preferences → About and as the release tag. -->
-    <Version>0.1.0</Version>
+    <Version>0.5.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

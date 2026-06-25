@@ -19,11 +19,22 @@ dotnet publish src/EmuDOS/EmuDOS.csproj -c Release -r linux-x64 \
 
 # The MT-32 shim (libemudos_mt32.so) is built + copied by the csproj's
 # BuildAndCopyMt32Shim target during publish; double-check it rode along.
-if [ ! -f "$PUB/libemudos_mt32.so" ]; then
-    echo "── build MT-32 shim (was missing from publish)"
-    ( cd src/native/mt32 && ./build.sh )
-    cp -f src/native/mt32/libemudos_mt32.so "$PUB/"
+# Rebuild the MT-32 shim against an OLD glibc so the .deb runs on mainstream Debian/Ubuntu, not just
+# bleeding-edge distros. Building on the host (e.g. Arch glibc 2.43) makes log10f@GLIBC_2.43 a hard
+# requirement that older glibc lacks. A debian:bullseye container (glibc 2.31) gives a broad baseline.
+# Falls back to the host build if no container runtime is present (with a loud warning).
+MT32_SO=src/native/mt32/libemudos_mt32.so
+CONTAINER=$(command -v podman || command -v docker || true)
+if [ -n "$CONTAINER" ]; then
+    echo "── build MT-32 shim against old glibc ($CONTAINER, debian:bullseye)"
+    "$CONTAINER" run --rm --network=host -v "$PWD/src/native/mt32":/mt32:Z debian:bullseye-slim \
+        bash -c "apt-get update -qq >/dev/null && apt-get install -y -q g++ >/dev/null && cd /mt32 && rm -f libemudos_mt32.so && ./build.sh"
+else
+    echo "!! WARNING: no podman/docker — building MT-32 shim with the HOST g++."
+    echo "!!          The .deb may then require this host's glibc; build on/with an old glibc for releases."
+    ( cd src/native/mt32 && rm -f libemudos_mt32.so && ./build.sh )
 fi
+cp -f "$MT32_SO" "$PUB/"
 
 # The librashader runtime (CRT shaders) is fetched + copied by the csproj's FetchAndCopyLibrashader
 # target during publish; double-check it rode along so end users never install a package.
@@ -77,8 +88,8 @@ Section: games
 Priority: optional
 Architecture: amd64
 Installed-Size: $INSTALLED_KB
-Depends: libc6, libgcc-s1, libstdc++6, libicu76 | libicu74 | libicu72, libx11-6, libfontconfig1, libegl1, libgl1, libsdl3-0, libpng16-16t64 | libpng16-16
-Recommends: ffmpeg, xorriso, libvlc5, vlc-plugin-base
+Depends: libc6, libgcc-s1, libstdc++6, libicu76 | libicu74 | libicu72 | libicu70, libx11-6, libx11-xcb1, libxcb1, libxi6, libxcursor1, libxext6, libxrandr2, libxrender1, libxfixes3, libgl1, libegl1, libfontconfig1, libfreetype6, libpng16-16t64 | libpng16-16, libsdl3-0, libdbus-1-3, libudev1, zlib1g, libbz2-1.0, libbrotli1, libexpat1
+Recommends: libvlc5, vlc-plugin-base, libpulse0, ffmpeg, xorriso
 Maintainer: EmuDOS for Linux <stragee@gmail.com>
 Description: A beautiful frontend for your classic DOS games
  Linux port of the EmuDOS frontend: a Boxer-style library manager for classic

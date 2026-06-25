@@ -4,7 +4,7 @@
 #   ssh://aur@aur.archlinux.org/emudos-bin.git
 #   makepkg --printsrcinfo > .SRCINFO
 pkgname=emudos-bin
-pkgver=0.1.0
+pkgver=0.5.0
 pkgrel=1
 pkgdesc="A beautiful frontend for your classic DOS games (DOSBox Pure libretro)"
 arch=('x86_64')
@@ -12,14 +12,15 @@ url="https://github.com/codingncaffeine/EmuDOS-For-Linux"
 license=('GPL-3.0-only')
 provides=('emudos')
 conflicts=('emudos')
-# sdl3 = gamepads. The publish is otherwise self-contained (.NET + the MT-32 shim
-# are bundled). The rest are optional: each feature degrades gracefully when absent.
-# The librashader CRT-shader runtime ships bundled in the tarball (librashader.so), so it is NOT a
-# dependency here.
-depends=('sdl3' 'fontconfig' 'libx11')
-optdepends=('ffmpeg: gameplay recording'
-            'libisoburn: build ISO disc images from a folder (xorriso)'
-            'libvlc: video previews')
+# Complete runtime set (verified against the live process's loaded libraries). The publish is
+# otherwise self-contained: .NET, the MT-32 shim and the librashader CRT runtime are bundled in the
+# tarball. sdl3 = gamepads/audio; libglvnd provides libGL/libEGL (shaders + 3dfx); the X libs are the
+# Avalonia surface; icu = .NET globalization; dbus/systemd-libs = desktop + udev (gamepad hotplug).
+depends=('sdl3' 'fontconfig' 'libglvnd' 'libx11' 'libxi' 'libxcursor' 'libxext'
+         'libxrandr' 'libxrender' 'libxfixes' 'icu' 'dbus' 'systemd-libs')
+optdepends=('vlc: video snap previews on game cards'
+            'ffmpeg: gameplay recording (also downloadable in-app)'
+            'libisoburn: build ISO disc images from a folder (xorriso)')
 options=('!strip')   # self-contained .NET bundle — stripping breaks it
 # The icon ships loose in the tarball as a bundled asset only via the build; pull it
 # from the repo at the tag instead, same as LICENSE.
