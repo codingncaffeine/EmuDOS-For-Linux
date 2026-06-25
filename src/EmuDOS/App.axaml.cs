@@ -48,6 +48,8 @@ public partial class App : Application
             window.OpenFirstCard();
         if (Environment.GetEnvironmentVariable("EMUDOS_AUTOPREFS") == "1")
             window.OpenPreferencesForSmoke();
+        if (Environment.GetEnvironmentVariable("EMUDOS_AUTOCHEAT") == "1")
+            new Views.CheatWindow().Show();
 
         // Check GitHub for a newer release and surface it in the bottom bar (best-effort, non-blocking).
         _ = viewModel.CheckForUpdatesAsync();

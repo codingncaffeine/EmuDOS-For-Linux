@@ -279,7 +279,7 @@ public partial class MainWindow : Window
         {
             ("Manage…", () => OpenManage(tile)),
             ("Rename from ScreenScraper…", () => RenameFromScreenScraper(tile)),
-            ("Cheats… (preview)", () => ComingSoon("Cheats")),
+            ("Cheats… (preview)", () => new CheatWindow().Show(this)),
             ("Game preferences…", () => OpenPreferences(tile)),
             ("Open in DOS", () => _ = LaunchGameAsync(tile, bootToDos: true)),
             ("Launch parameters…", () => EditLaunchParameters(tile)),

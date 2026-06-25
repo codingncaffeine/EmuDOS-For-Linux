@@ -1,0 +1,325 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:v="using:EmuDOS.Views"
+        x:Class="EmuDOS.Views.CheatWindow"
+        Title="EmuDOS Cheat Engine" WindowDecorations="None" TransparencyLevelHint="Transparent"
+        Background="Transparent" CanResize="False" ShowInTaskbar="True"
+        Width="1120" Height="640" WindowStartupLocation="CenterScreen"
+        FontFamily="Consolas, Noto Sans Mono, monospace" KeyDown="OnKeyDown">
+
+  <!--
+    The cheat engine — a 1998 "System Shock" CRT console. Ported 1:1 from the WPF CheatWindow:
+    WPF keyed Styles → Avalonia ControlThemes (NeonButton/NeonField) and class selectors
+    (.option/.label); the WPF DropShadowEffect glows → the CSS-style drop-shadow() string; the
+    tiled scanline DrawingBrush → a code-behind ImageBrush (absolute tile rect isn't expressible
+    in XAML). MouseLeftButtonDown → PointerPressed; DragMove() → BeginMoveDrag().
+  -->
+
+  <Window.Resources>
+    <SolidColorBrush x:Key="Screen" Color="#07121A"/>
+    <SolidColorBrush x:Key="Panel" Color="#0A1C26"/>
+    <SolidColorBrush x:Key="NeonGreen" Color="#3BFF7D"/>
+    <SolidColorBrush x:Key="NeonCyan" Color="#33E6FF"/>
+    <SolidColorBrush x:Key="NeonMagenta" Color="#E24AB0"/>
+    <SolidColorBrush x:Key="NeonYellow" Color="#C6FF46"/>
+    <SolidColorBrush x:Key="BodyGreen" Color="#79FFB0"/>
+    <SolidColorBrush x:Key="BodyCyan" Color="#86F0FF"/>
+    <SolidColorBrush x:Key="Dim" Color="#3E7D74"/>
+    <SolidColorBrush x:Key="FieldBg" Color="#06222A"/>
+
+    <LinearGradientBrush x:Key="NeonEdge" StartPoint="0%,0%" EndPoint="100%,100%">
+      <GradientStop Color="#3BFF7D" Offset="0"/>
+      <GradientStop Color="#33E6FF" Offset="0.55"/>
+      <GradientStop Color="#E24AB0" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="TitleBar" StartPoint="0%,0%" EndPoint="100%,0%">
+      <GradientStop Color="#7A1E6B" Offset="0"/>
+      <GradientStop Color="#C42B8E" Offset="0.5"/>
+      <GradientStop Color="#7A1E6B" Offset="1"/>
+    </LinearGradientBrush>
+
+    <!-- Clickable neon command button: [ CONTENT ] with a green glow, yellow on hover. -->
+    <ControlTheme x:Key="NeonButton" TargetType="Button">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{StaticResource NeonGreen}"/>
+      <Setter Property="FontWeight" Value="Bold"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Margin" Value="0,0,14,0"/>
+      <Setter Property="Effect" Value="drop-shadow(0 0 12 #D93BFF7D)"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="Transparent" Padding="2,1">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="["/>
+              <ContentPresenter Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"/>
+              <TextBlock Text="]"/>
+            </StackPanel>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:pointerover">
+        <Setter Property="Foreground" Value="{StaticResource NeonYellow}"/>
+      </Style>
+    </ControlTheme>
+
+    <!-- Neon entry field: green-on-dark, based on the global TextBox theme (keeps its template). -->
+    <ControlTheme x:Key="NeonField" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+      <Setter Property="Background" Value="{StaticResource FieldBg}"/>
+      <Setter Property="Foreground" Value="{StaticResource BodyGreen}"/>
+      <Setter Property="CaretBrush" Value="{StaticResource NeonGreen}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource NeonGreen}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding" Value="5,2"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </ControlTheme>
+
+    <!-- Result rows: green text, #143A4A + neon-green when selected. -->
+    <ControlTheme x:Key="ResultItem" TargetType="ListBoxItem">
+      <Setter Property="Foreground" Value="{StaticResource BodyGreen}"/>
+      <Setter Property="Padding" Value="4,1"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="b" Background="Transparent" Padding="{TemplateBinding Padding}">
+            <ContentPresenter Content="{TemplateBinding ContentPresenter.Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"/>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:selected /template/ Border#b">
+        <Setter Property="Background" Value="#143A4A"/>
+      </Style>
+      <Style Selector="^:selected">
+        <Setter Property="Foreground" Value="{StaticResource NeonGreen}"/>
+      </Style>
+    </ControlTheme>
+
+    <!-- Cheat-table rows: stretch to full width, #143A4A when selected. -->
+    <ControlTheme x:Key="CheatItem" TargetType="ListBoxItem">
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Padding" Value="2,1"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="b" Background="Transparent" Padding="{TemplateBinding Padding}">
+            <ContentPresenter Content="{TemplateBinding ContentPresenter.Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalContentAlignment="Stretch"/>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:selected /template/ Border#b">
+        <Setter Property="Background" Value="#143A4A"/>
+      </Style>
+    </ControlTheme>
+  </Window.Resources>
+
+  <Window.Styles>
+    <!-- Clickable option token (BYTE / EXACT / …); selection colour set in code-behind. -->
+    <Style Selector="TextBlock.option">
+      <Setter Property="Foreground" Value="{StaticResource Dim}"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Margin" Value="0,0,2,0"/>
+    </Style>
+    <Style Selector="TextBlock.label">
+      <Setter Property="Foreground" Value="{StaticResource BodyGreen}"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+  </Window.Styles>
+
+  <Border Background="#23282B" CornerRadius="22" Padding="14" BoxShadow="0 0 40 0 #E6000000">
+    <Border CornerRadius="14" ClipToBounds="True" BorderBrush="#11181C" BorderThickness="2">
+      <Grid>
+        <Grid.Background>
+          <RadialGradientBrush GradientOrigin="50%,42%" Center="50%,42%" RadiusX="75%" RadiusY="85%">
+            <GradientStop Color="#0C1F2A" Offset="0"/>
+            <GradientStop Color="#07121A" Offset="0.7"/>
+            <GradientStop Color="#03080C" Offset="1"/>
+          </RadialGradientBrush>
+        </Grid.Background>
+
+        <Border Margin="6" CornerRadius="8" BorderBrush="{StaticResource NeonEdge}" BorderThickness="2"
+                Effect="drop-shadow(0 0 14 #D9E24AB0)"/>
+
+        <Grid Margin="16" RowDefinitions="Auto,Auto,*,Auto">
+
+          <!-- Title -->
+          <Border Grid.Row="0" Background="{StaticResource TitleBar}" CornerRadius="3" Height="26"
+                  PointerPressed="OnTitleDrag" Effect="drop-shadow(0 0 14 #D9E24AB0)">
+            <Grid>
+              <TextBlock Text="EMUDOS — THE ULTIMATE DOS CHEAT ENGINE [v1.3]" Foreground="White"
+                         FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+              <TextBlock Text="✕" Foreground="White" FontWeight="Bold" Cursor="Hand"
+                         HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0"
+                         PointerPressed="OnClose"/>
+            </Grid>
+          </Border>
+
+          <!-- Logo -->
+          <Grid Grid.Row="1" Margin="0,12,0,10">
+            <TextBlock HorizontalAlignment="Left" VerticalAlignment="Center"
+                       Foreground="{StaticResource NeonGreen}" Effect="drop-shadow(0 0 12 #D93BFF7D)"
+                       FontSize="30" FontWeight="Bold" Text="☠ DOS"/>
+            <TextBlock x:Name="StatusText" HorizontalAlignment="Right" VerticalAlignment="Center"
+                       FontSize="11" Foreground="{StaticResource Dim}" Text="⌁ MEM-LINK ACTIVE"/>
+          </Grid>
+
+          <!-- Body -->
+          <Grid Grid.Row="2" ColumnDefinitions="340,18,*">
+
+            <!-- LEFT -->
+            <Grid Grid.Column="0" RowDefinitions="Auto,12,*">
+
+              <!-- MEMORY SCANNER -->
+              <Border Grid.Row="0" Background="{StaticResource Panel}" BorderBrush="{StaticResource NeonGreen}"
+                      BorderThickness="1.5" CornerRadius="3" Padding="14,18,14,14" Effect="drop-shadow(0 0 12 #D93BFF7D)">
+                <StackPanel>
+                  <TextBlock Text="MEMORY SCANNER" Foreground="{StaticResource NeonGreen}" FontWeight="Bold"
+                             Margin="0,-26,0,8" Background="{StaticResource Screen}" Padding="4,0" HorizontalAlignment="Left"/>
+                  <Grid Margin="0,2" ColumnDefinitions="130,*">
+                    <TextBlock Text="START ADDRESS:" Classes="label"/>
+                    <TextBox x:Name="StartBox" Grid.Column="1" Theme="{StaticResource NeonField}"/>
+                  </Grid>
+                  <Grid Margin="0,4" ColumnDefinitions="130,*">
+                    <TextBlock Text="END ADDRESS:" Classes="label"/>
+                    <TextBox x:Name="EndBox" Grid.Column="1" Theme="{StaticResource NeonField}"/>
+                  </Grid>
+                  <Grid Margin="0,4" ColumnDefinitions="130,*">
+                    <TextBlock Text="VALUE TO FIND:" Classes="label"/>
+                    <TextBox x:Name="ValueBox" Grid.Column="1" Theme="{StaticResource NeonField}"/>
+                  </Grid>
+                  <StackPanel x:Name="TypeSelector" Orientation="Horizontal" Margin="0,4,0,6">
+                    <TextBlock Text="[" Foreground="{StaticResource Dim}"/>
+                    <TextBlock Text="BYTE" Tag="Byte" Classes="option" PointerPressed="OnPickType"/>
+                    <TextBlock Text="/" Foreground="{StaticResource Dim}"/>
+                    <TextBlock Text="WORD" Tag="Word" Classes="option" PointerPressed="OnPickType"/>
+                    <TextBlock Text="/" Foreground="{StaticResource Dim}"/>
+                    <TextBlock Text="DWORD" Tag="Dword" Classes="option" PointerPressed="OnPickType"/>
+                    <TextBlock Text="/" Foreground="{StaticResource Dim}"/>
+                    <TextBlock Text="FLOAT" Tag="Float" Classes="option" PointerPressed="OnPickType"/>
+                    <TextBlock Text="]" Foreground="{StaticResource Dim}"/>
+                  </StackPanel>
+                  <TextBlock Text="SCAN TYPE:" Classes="label" HorizontalAlignment="Left"/>
+                  <WrapPanel x:Name="ScanSelector" Margin="0,2,0,10">
+                    <TextBlock Text="[" Foreground="{StaticResource Dim}"/>
+                    <TextBlock Text="EXACT" Tag="Exact" Classes="option" PointerPressed="OnPickScan"/>
+                    <TextBlock Text="/" Foreground="{StaticResource Dim}"/>
+                    <TextBlock Text="INCREASED" Tag="Increased" Classes="option" PointerPressed="OnPickScan"/>
+                    <TextBlock Text="/" Foreground="{StaticResource Dim}"/>
+                    <TextBlock Text="DECREASED" Tag="Decreased" Classes="option" PointerPressed="OnPickScan"/>
+                    <TextBlock Text="/" Foreground="{StaticResource Dim}"/>
+                    <TextBlock Text="CHANGED" Tag="Changed" Classes="option" PointerPressed="OnPickScan"/>
+                    <TextBlock Text="/" Foreground="{StaticResource Dim}"/>
+                    <TextBlock Text="UNKNOWN" Tag="Unknown" Classes="option" PointerPressed="OnPickScan"/>
+                    <TextBlock Text="]" Foreground="{StaticResource Dim}"/>
+                  </WrapPanel>
+                  <StackPanel Orientation="Horizontal">
+                    <Button Content="START SCAN" Theme="{StaticResource NeonButton}" Click="OnStartScan"/>
+                    <Button Content="NEXT SCAN" Theme="{StaticResource NeonButton}" Click="OnNextScan"/>
+                    <Button Content="UNDO SCAN" Theme="{StaticResource NeonButton}" Click="OnUndoScan"/>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+
+              <!-- RESULTS -->
+              <Border Grid.Row="2" Background="{StaticResource Panel}" BorderBrush="{StaticResource NeonGreen}"
+                      BorderThickness="1.5" CornerRadius="3" Padding="14,18,14,12" Effect="drop-shadow(0 0 12 #D93BFF7D)">
+                <Grid RowDefinitions="Auto,*">
+                  <TextBlock Grid.Row="0" x:Name="ResultsHeader" Text="RESULTS" Foreground="{StaticResource NeonGreen}"
+                             FontWeight="Bold" Margin="0,-26,0,4" Background="{StaticResource Screen}" Padding="4,0"
+                             HorizontalAlignment="Left"/>
+                  <ListBox x:Name="ResultsList" Grid.Row="1" Background="Transparent" BorderThickness="0"
+                           Foreground="{StaticResource BodyGreen}" SelectionChanged="OnResultSelected"
+                           DisplayMemberBinding="{ReflectionBinding Display}"
+                           ItemContainerTheme="{StaticResource ResultItem}"
+                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+                </Grid>
+              </Border>
+            </Grid>
+
+            <!-- RIGHT: CHEAT TABLE + VALUE EDITOR -->
+            <Border Grid.Column="2" Background="{StaticResource Panel}" BorderBrush="{StaticResource NeonCyan}"
+                    BorderThickness="1.5" CornerRadius="3" Padding="16,18,16,14" Effect="drop-shadow(0 0 12 #D933E6FF)">
+              <Grid RowDefinitions="Auto,*">
+                <TextBlock Grid.Row="0" Text="CHEAT TABLE / CODES" Foreground="{StaticResource NeonCyan}" FontWeight="Bold"
+                           Margin="0,-26,0,10" Background="{StaticResource Screen}" Padding="4,0" HorizontalAlignment="Left"/>
+                <Grid Grid.Row="0" VerticalAlignment="Top"
+                      ColumnDefinitions="1.2*,*,*,1.4*,0.7*">
+                  <TextBlock Grid.Column="0" Text="ADDRESS (HEX)" Foreground="{StaticResource BodyCyan}"/>
+                  <TextBlock Grid.Column="1" Text="CURRENT" Foreground="{StaticResource BodyCyan}"/>
+                  <TextBlock Grid.Column="2" Text="NEW VALUE" Foreground="{StaticResource BodyCyan}"/>
+                  <TextBlock Grid.Column="3" Text="DESCRIPTION" Foreground="{StaticResource BodyCyan}"/>
+                  <TextBlock Grid.Column="4" Text="FREEZE (X)" Foreground="{StaticResource BodyCyan}"/>
+                </Grid>
+
+                <ListBox x:Name="CheatTable" Grid.Row="1" Margin="0,30,0,0" Background="Transparent"
+                         BorderThickness="0" ItemContainerTheme="{StaticResource CheatItem}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="v:CheatRow">
+                      <Grid Margin="0,2" ColumnDefinitions="1.2*,*,*,1.4*,0.7*">
+                        <TextBlock Grid.Column="0" Text="{Binding Address}" Foreground="{StaticResource NeonCyan}"/>
+                        <TextBlock Grid.Column="1" Text="{Binding CurrentValue}" Foreground="{StaticResource BodyCyan}"/>
+                        <TextBox Grid.Column="2" Text="{Binding NewValue, Mode=TwoWay}" Margin="0,0,8,0"
+                                 Background="{StaticResource FieldBg}" Foreground="{StaticResource BodyCyan}"
+                                 BorderBrush="{StaticResource NeonCyan}" BorderThickness="1" Padding="3,0"/>
+                        <TextBlock Grid.Column="3" Text="{Binding Description}" Foreground="{StaticResource Dim}"/>
+                        <CheckBox Grid.Column="4" IsChecked="{Binding Freeze, Mode=TwoWay}" Foreground="{StaticResource NeonCyan}"
+                                  IsCheckedChanged="OnFreezeChanged"/>
+                      </Grid>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- VALUE EDITING PANEL -->
+                <Border Grid.Row="1" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-4,-2" Width="560"
+                        Background="#08222C" BorderBrush="{StaticResource NeonCyan}" BorderThickness="1.5"
+                        CornerRadius="3" Padding="16,18,16,14" Effect="drop-shadow(0 0 12 #D933E6FF)">
+                  <StackPanel>
+                    <TextBlock Text="VALUE EDITING PANEL" Foreground="{StaticResource NeonCyan}" FontWeight="Bold"
+                               Margin="0,-26,0,10" Background="#08222C" Padding="4,0" HorizontalAlignment="Left"/>
+                    <Grid Margin="0,2" ColumnDefinitions="190,*">
+                      <TextBlock Text="SELECTED ADDRESS:" Foreground="{StaticResource BodyCyan}"/>
+                      <TextBlock Grid.Column="1" x:Name="SelAddrText" Text="—" Foreground="{StaticResource NeonCyan}" FontWeight="Bold"/>
+                    </Grid>
+                    <Grid Margin="0,4" ColumnDefinitions="190,*">
+                      <TextBlock Text="CURRENT VALUE:" Foreground="{StaticResource BodyCyan}"/>
+                      <TextBlock Grid.Column="1" x:Name="CurValText" Text="—" Foreground="{StaticResource NeonCyan}" FontWeight="Bold"/>
+                    </Grid>
+                    <Grid Margin="0,4" ColumnDefinitions="190,*">
+                      <TextBlock Text="NEW VALUE (DEC):" Foreground="{StaticResource BodyCyan}"/>
+                      <TextBox Grid.Column="1" x:Name="EditValueBox" Theme="{StaticResource NeonField}"
+                               BorderBrush="{StaticResource NeonCyan}" Foreground="{StaticResource BodyCyan}"
+                               CaretBrush="{StaticResource NeonCyan}"/>
+                    </Grid>
+                    <Grid Margin="0,4,0,10" ColumnDefinitions="190,*">
+                      <TextBlock Text="DESCRIPTION:" Foreground="{StaticResource BodyCyan}"/>
+                      <TextBox Grid.Column="1" x:Name="EditDescBox" Theme="{StaticResource NeonField}"
+                               BorderBrush="{StaticResource NeonCyan}" Foreground="{StaticResource BodyCyan}"
+                               CaretBrush="{StaticResource NeonCyan}"/>
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                      <Button Content="WRITE VALUE" Theme="{StaticResource NeonButton}"
+                              Foreground="{StaticResource NeonYellow}" Click="OnWriteValue"/>
+                      <Button Content="ADD TO TABLE" Theme="{StaticResource NeonButton}" Margin="14,0,0,0"
+                              Foreground="{StaticResource NeonCyan}" Effect="drop-shadow(0 0 12 #D933E6FF)" Click="OnAddToTable"/>
+                      <Button Content="REMOVE FROM TABLE" Theme="{StaticResource NeonButton}" Margin="14,0,0,0"
+                              Foreground="{StaticResource NeonMagenta}" Effect="drop-shadow(0 0 14 #D9E24AB0)" Click="OnRemoveFromTable"/>
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+              </Grid>
+            </Border>
+          </Grid>
+
+          <Grid Grid.Row="3" Margin="0,10,0,0">
+            <TextBlock Text="C:\&gt; EMUDOS_ENG.EXE" Foreground="{StaticResource BodyGreen}" HorizontalAlignment="Left"/>
+            <TextBlock Text="© 1998 EMUDOS SYSTEMS" Foreground="{StaticResource Dim}" HorizontalAlignment="Right"/>
+          </Grid>
+        </Grid>
+
+        <!-- CRT scanlines; Fill (a tiled ImageBrush) is built in code-behind. -->
+        <Rectangle x:Name="ScanlineOverlay" IsHitTestVisible="False" Opacity="0.14"/>
+      </Grid>
+    </Border>
+  </Border>
+</Window>
