@@ -45,6 +45,8 @@ public sealed class DownloadService(HttpClient http, AppPaths paths) : IDownload
 
             if (asset.Kind == DownloadKind.ZippedCore)
                 ExtractEntry(tempFile, asset.FileName, finalPath);
+            else if (asset.Kind == DownloadKind.TarXzBinary)
+                ExtractTarXzBinary(tempFile, asset.FileName, finalPath);
             else
                 File.Copy(tempFile, finalPath, overwrite: true);
 
@@ -102,6 +104,41 @@ public sealed class DownloadService(HttpClient http, AppPaths paths) : IDownload
                    $"'{entryName}' not found in downloaded archive.");
 
         entry.ExtractToFile(destination, overwrite: true);
+    }
+
+    /// <summary>Extract a single nested executable (matched by leaf name) from a .tar.xz and mark it
+    /// executable. Uses the system <c>tar</c> (xz support via liblzma) — universally present on Linux,
+    /// and the same toolchain the disc-image path already relies on.</summary>
+    private static void ExtractTarXzBinary(string tarXzPath, string memberLeafName, string destination)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo("tar")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        // Match the member anywhere in the archive by its leaf name (e.g. ffmpeg-*/bin/ffmpeg) and
+        // stream just that one file to stdout, which we write to the destination.
+        psi.ArgumentList.Add("-xJf");
+        psi.ArgumentList.Add(tarXzPath);
+        psi.ArgumentList.Add("--wildcards");
+        psi.ArgumentList.Add("--to-stdout");
+        psi.ArgumentList.Add("*/" + memberLeafName);
+
+        using var p = System.Diagnostics.Process.Start(psi)
+            ?? throw new InvalidOperationException("Couldn't start 'tar' to extract the download.");
+        using (var outFile = File.Create(destination))
+            p.StandardOutput.BaseStream.CopyTo(outFile);
+        p.WaitForExit();
+        if (p.ExitCode != 0 || new FileInfo(destination).Length == 0)
+            throw new InvalidOperationException(
+                $"'{memberLeafName}' not found in the downloaded archive (tar exit {p.ExitCode}).");
+
+        if (!OperatingSystem.IsWindows())
+            File.SetUnixFileMode(destination,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+                UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
     }
 
     private static string ComputeSha256(string path)

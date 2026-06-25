@@ -41,26 +41,25 @@ public static class AssetManifest
     // LGPL-based DLL, so unlike the GPL core there's no reason to download it. The only
     // user-supplied MT-32 piece is the Roland ROMs (copyrighted; detected, never distributed).
 
-    // On Linux, FFmpeg and SDL3 are system packages (the .deb/AUR list them as Depends), exactly like
-    // libvlc — so they're NOT downloaded the way the Windows app fetches win64 binaries. The Ffmpeg
-    // asset is kept only so InstalledPath() resolves; recording falls back to the distro's ffmpeg on
-    // PATH when no bundled copy exists (see EmulatorWindow.ResolveFfmpeg). Neither is in All, so the
-    // Downloads tab doesn't offer them.
+    // FFmpeg (video recording) downloads from the Downloads tab exactly like the Windows app — no
+    // system package, no terminal. BtbN ships a fully static Linux build as a .tar.xz; we pull the
+    // single `ffmpeg` binary out of it (TarXzBinary) and mark it executable. The record path still
+    // falls back to a distro ffmpeg on PATH if one happens to be installed (see EmulatorWindow).
     public const string FfmpegFileName = "ffmpeg";
 
-    /// <summary>FFmpeg (GPL) for video recording — a system package on Linux (the record path resolves
-    /// it from PATH). Kept as an asset only for InstalledPath() compatibility; not offered as a download.</summary>
+    /// <summary>FFmpeg (GPL) for video recording — downloaded, not bundled, like the core. BtbN's
+    /// linux64 GPL build is a static .tar.xz carrying ffmpeg under bin/; TarXzBinary extracts it.</summary>
     public static DownloadAsset Ffmpeg { get; } = new()
     {
         Id = "ffmpeg",
         DisplayName = "FFmpeg (video recording)",
-        Description = "Enables recording gameplay video. Provided by your distro's ffmpeg package.",
-        Url = string.Empty,
-        Kind = DownloadKind.File,
+        Description = "Enables recording gameplay video. Optional — only needed for the record feature.",
+        Url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz",
+        Kind = DownloadKind.TarXzBinary,
         FileName = FfmpegFileName,
         Category = AssetCategory.Native,
     };
 
-    /// <summary>All assets the Downloads tab can offer. FFmpeg and SDL3 are system packages on Linux.</summary>
-    public static IReadOnlyList<DownloadAsset> All { get; } = [DosBoxPure, Catalog];
+    /// <summary>All assets the Downloads tab can offer. SDL3 is bundled (gamepads); FFmpeg is optional.</summary>
+    public static IReadOnlyList<DownloadAsset> All { get; } = [DosBoxPure, Catalog, Ffmpeg];
 }
