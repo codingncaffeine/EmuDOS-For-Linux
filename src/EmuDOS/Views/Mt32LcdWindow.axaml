@@ -1,0 +1,17 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctrl="using:EmuDOS.Controls"
+        x:Class="EmuDOS.Views.Mt32LcdWindow"
+        Title="MT-32" WindowDecorations="None" TransparencyLevelHint="Transparent"
+        Background="Transparent" CanResize="False" SizeToContent="WidthAndHeight"
+        ShowInTaskbar="False" Topmost="True"
+        PointerPressed="OnDrag" PointerWheelChanged="OnScaleWheel">
+  <!-- The Roland MT-32 photo at native size in a Viewbox (scroll-wheel resizes it, aspect locked);
+       our dot-matrix LCD is overlaid on the glass area. -->
+  <Viewbox x:Name="Scaler" Width="600" Stretch="Uniform">
+    <Canvas Width="1184" Height="471">
+      <Image Source="/Assets/roland.png" Width="1184" Height="471"/>
+      <ctrl:Mt32LcdControl x:Name="Lcd" Canvas.Left="160" Canvas.Top="150" Width="560" Height="236"/>
+    </Canvas>
+  </Viewbox>
+</Window>

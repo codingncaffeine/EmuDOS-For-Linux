@@ -163,6 +163,30 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
             FpsOverlay.Text = lockFps > 0 ? $"FPS {frames} / {lockFps}" : $"FPS {frames}";
         };
         _fpsTimer.Start();
+
+        // Poll the MT-32 LCD; the synth is created on the engine thread, so show the floating display
+        // the moment its text appears and keep it updated. Only games using MT-32 MIDI ever surface text.
+        _lcdTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
+        _lcdTimer.Tick += UpdateLcd;
+        _lcdTimer.Start();
+    }
+
+    private Mt32LcdWindow? _lcdWindow;
+    private DispatcherTimer? _lcdTimer;
+
+    private void UpdateLcd(object? sender, EventArgs e)
+    {
+        var text = _session.Mt32Lcd;
+        if (text is null)
+            return; // MT-32 synth not active for this game
+
+        if (_lcdWindow is null)
+        {
+            _lcdWindow = new Mt32LcdWindow();
+            _lcdWindow.Show(this);
+        }
+
+        _lcdWindow.SetText(text);
     }
 
     public IInputSource Input => this;
@@ -853,6 +877,9 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
     {
         _fpsTimer?.Stop();
         _hintTimer?.Stop();
+        _lcdTimer?.Stop();
+        try { _lcdWindow?.Close(); } catch { }
+        _lcdWindow = null;
         if (_recorder?.IsRecording == true)
         {
             try { _recorder.Stop(); } catch { } // finalize the recording before tearing the session down
