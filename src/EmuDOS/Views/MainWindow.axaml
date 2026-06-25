@@ -1,0 +1,16 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="EmuDOS.Views.MainWindow"
+        Width="1100" Height="720"
+        MinWidth="900" MinHeight="600"
+        Title="EmuDOS"
+        Background="#1a1a1a">
+  <!-- Phase 1 skeleton. The bookshelf library (ShelfPanel + GameTile) lands in Phase 2. -->
+  <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+    <TextBlock Text="EmuDOS for Linux"
+               HorizontalAlignment="Center" Foreground="#e6e6e6"
+               FontSize="28" FontWeight="SemiBold" />
+    <TextBlock Text="skeleton — library shelf coming in Phase 2"
+               HorizontalAlignment="Center" Foreground="#8a8a8a" FontSize="14" />
+  </StackPanel>
+</Window>
