@@ -74,12 +74,14 @@ public partial class PreferencesWindow : Window
         var downloadRows = AssetManifest.All
             .Select(a => new DownloadRow(a, _services.Downloads.IsInstalled(a)))
             .ToList();
-        // CRT shaders: the librashader GL renderer + slang pack land with the shader phase (backlog C).
+        // CRT shaders: the libretro slang preset pack. The librashader GL engine is a system package
+        // (a dependency); F3 in-game cycles the CRT presets once the pack is installed.
+        var paths = _services.Paths;
         downloadRows.Add(new DownloadRow(
             "CRT shaders",
-            "The libretro slang shader collection (CRT, scanlines, monitors) plus the librashader engine. Lands with the shader-rendering update.",
-            installed: false,
-            customDownload: _ => throw new NotSupportedException("CRT shaders are coming in a later update.")));
+            "The libretro slang shader collection (CRT, scanlines, monitors). Press F3 in a game to cycle CRT presets. Needs the librashader runtime, a package dependency.",
+            installed: Effects.Librashader.ShaderDownloader.IsInstalled(paths.SlangShaderRoot, paths.LibrashaderDllPath),
+            customDownload: report => Effects.Librashader.ShaderDownloader.DownloadAsync(paths.SlangShaderRoot, paths.LibrashaderDllPath, report)));
         DownloadList.ItemsSource = downloadRows;
 
         bool hasRoms = _services.SystemFiles.HasMt32;

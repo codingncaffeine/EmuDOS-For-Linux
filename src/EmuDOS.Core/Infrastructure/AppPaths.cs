@@ -44,12 +44,13 @@ public sealed class AppPaths
     /// when a game is deleted so re-importing (e.g. a different version) reuses it, like box art.</summary>
     public string SnapsDir => Path.Combine(DataRoot, "Snaps");
 
-    /// <summary>Downloaded libretro slang shader pack + librashader.dll (CRT shaders).</summary>
+    /// <summary>Downloaded libretro slang shader pack + the librashader runtime (CRT shaders).</summary>
     public string ShadersDir => Path.Combine(DataRoot, "Shaders");
     /// <summary>Root of the extracted slang shader pack (under <see cref="ShadersDir"/>).</summary>
     public string SlangShaderRoot => Path.Combine(ShadersDir, "slang");
-    /// <summary>The librashader runtime DLL path (under <see cref="ShadersDir"/>).</summary>
-    public string LibrashaderDllPath => Path.Combine(ShadersDir, "librashader.dll");
+    /// <summary>The librashader runtime path (under <see cref="ShadersDir"/>). On Linux it's the .so;
+    /// the loader also falls back to the system librashader.so (a packaging Depends).</summary>
+    public string LibrashaderDllPath => Path.Combine(ShadersDir, "librashader.so");
 
     private static string DefaultDataRoot() => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EmuDOS");
