@@ -1,0 +1,26 @@
+pkgbase = emudos-bin
+	pkgdesc = A beautiful frontend for your classic DOS games (DOSBox Pure libretro)
+	pkgver = 0.1.0
+	pkgrel = 1
+	url = https://github.com/codingncaffeine/EmuDOS-For-Linux
+	arch = x86_64
+	license = GPL-3.0-only
+	depends = sdl3
+	depends = fontconfig
+	depends = libx11
+	optdepends = ffmpeg: gameplay recording
+	optdepends = libisoburn: build ISO disc images from a folder (xorriso)
+	optdepends = libvlc: video previews
+	provides = emudos
+	conflicts = emudos
+	options = !strip
+	source = https://github.com/codingncaffeine/EmuDOS-For-Linux/releases/download/v0.1.0/EmuDOS-0.1.0-linux-x64.tar.gz
+	source = https://github.com/codingncaffeine/EmuDOS-For-Linux/raw/v0.1.0/LICENSE
+	source = emudos-linux.png::https://github.com/codingncaffeine/EmuDOS-For-Linux/raw/v0.1.0/src/EmuDOS/Assets/emudos-linux.png
+	source = io.github.codingncaffeine.EmuDOS.metainfo.xml::https://github.com/codingncaffeine/EmuDOS-For-Linux/raw/v0.1.0/packaging/io.github.codingncaffeine.EmuDOS.metainfo.xml
+	sha256sums = SKIP
+	sha256sums = SKIP
+	sha256sums = SKIP
+	sha256sums = SKIP
+
+pkgname = emudos-bin
