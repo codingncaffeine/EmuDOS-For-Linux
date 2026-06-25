@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metadata — consumed by Flathub / GNOME Software / KDE Discover.
+     Validate with: appstreamcli validate packaging/io.github.codingncaffeine.EmuDOS.metainfo.xml -->
+<component type="desktop-application">
+  <id>io.github.codingncaffeine.EmuDOS</id>
+  <name>EmuDOS</name>
+  <summary>A beautiful frontend for your classic DOS games</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <developer id="io.github.codingncaffeine">
+    <name>codingncaffeine</name>
+  </developer>
+
+  <description>
+    <p>
+      EmuDOS is a polished, Boxer-style library manager and frontend for classic
+      DOS gaming, built on the DOSBox Pure libretro core. Drop in a game folder or
+      disc image and EmuDOS identifies it, fetches box art and metadata, and
+      presents your collection as a beautiful, browsable shelf.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Library shelf with box art, metadata, descriptions and favorites</li>
+      <li>One-click play through the bundled DOSBox Pure core (downloaded on demand)</li>
+      <li>Save states, screenshots, cheats, per-game notes and shell-opened manuals</li>
+      <li>Disc games: mount from images or build an ISO from a folder</li>
+      <li>Hardware 3dfx/Voodoo rendering through OpenGL, with software fallback</li>
+      <li>CRT shaders via librashader, Roland MT-32 synthesis with an on-screen LCD</li>
+      <li>Gamepad support, per-game machine tuning, and in-app updates</li>
+    </ul>
+    <p>
+      EmuDOS does not include any games, BIOS files, or copyrighted system software.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">io.github.codingncaffeine.EmuDOS.desktop</launchable>
+
+  <url type="homepage">https://github.com/codingncaffeine/EmuDOS-For-Linux</url>
+  <url type="bugtracker">https://github.com/codingncaffeine/EmuDOS-For-Linux/issues</url>
+  <url type="vcs-browser">https://github.com/codingncaffeine/EmuDOS-For-Linux</url>
+
+  <!-- TODO before Flathub submission: host 2-4 screenshots (16:9 PNGs of the library
+       shelf, game detail, in-game view, preferences) and reference them here. -->
+  <!--
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/codingncaffeine/EmuDOS-For-Linux/main/docs/screenshots/library.png</image>
+      <caption>The game library shelf</caption>
+    </screenshot>
+  </screenshots>
+  -->
+
+  <categories>
+    <category>Game</category>
+    <category>Emulator</category>
+  </categories>
+
+  <content_rating type="oars-1.1"/>
+
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>gamepad</control>
+  </supports>
+
+  <releases>
+    <release version="0.1.0" date="2026-06-25">
+      <description><p>First Linux release.</p></description>
+    </release>
+  </releases>
+</component>
