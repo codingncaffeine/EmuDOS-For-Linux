@@ -198,6 +198,138 @@
     </Style>
   </ControlTheme>
 
+  <!-- ContextMenu: dark rounded popup card. -->
+  <ControlTheme x:Key="{x:Type ContextMenu}" TargetType="ContextMenu">
+    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    <Setter Property="Background" Value="{StaticResource BgSecondary}"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{StaticResource BgSecondary}" BorderBrush="{StaticResource BorderNormal}"
+                BorderThickness="1" CornerRadius="4" Padding="3">
+          <ItemsPresenter Name="PART_ItemsPresenter"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
+  <!-- MenuItem: flat dark row, BgTertiary on hover, no icon/checkmark column or submenu arrow. -->
+  <ControlTheme x:Key="{x:Type MenuItem}" TargetType="MenuItem">
+    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="b" Background="Transparent" CornerRadius="3" Padding="10,6">
+          <ContentPresenter Content="{TemplateBinding Header}"
+                            ContentTemplate="{TemplateBinding HeaderTemplate}"
+                            VerticalAlignment="Center"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:selected /template/ Border#b">
+      <Setter Property="Background" Value="{StaticResource BgTertiary}"/>
+    </Style>
+    <Style Selector="^:pointerover /template/ Border#b">
+      <Setter Property="Background" Value="{StaticResource BgTertiary}"/>
+    </Style>
+    <Style Selector="^:disabled">
+      <Setter Property="Opacity" Value="0.45"/>
+    </Style>
+  </ControlTheme>
+
+  <!-- Slider: thin 4px track, 14px accent ellipse thumb (horizontal). -->
+  <ControlTheme x:Key="{x:Type Slider}" TargetType="Slider">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Grid VerticalAlignment="Center" MinHeight="20">
+          <Border Height="4" CornerRadius="2" Background="{StaticResource BorderNormal}" VerticalAlignment="Center"/>
+          <Track Name="PART_Track" Orientation="Horizontal"
+                 Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}"
+                 Value="{TemplateBinding Value, Mode=TwoWay}">
+            <Track.DecreaseButton>
+              <RepeatButton Name="PART_DecreaseButton" Opacity="0" Focusable="False">
+                <RepeatButton.Template><ControlTemplate><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template>
+              </RepeatButton>
+            </Track.DecreaseButton>
+            <Track.IncreaseButton>
+              <RepeatButton Name="PART_IncreaseButton" Opacity="0" Focusable="False">
+                <RepeatButton.Template><ControlTemplate><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template>
+              </RepeatButton>
+            </Track.IncreaseButton>
+            <Track.Thumb>
+              <Thumb Width="14" Height="14">
+                <Thumb.Template>
+                  <ControlTemplate>
+                    <Ellipse Fill="{StaticResource Accent}"/>
+                  </ControlTemplate>
+                </Thumb.Template>
+              </Thumb>
+            </Track.Thumb>
+          </Track>
+        </Grid>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
+  <!-- ScrollBar: thin (11px) dark track with a rounded grey thumb. -->
+  <ControlTheme x:Key="EmuScrollBarThumb" TargetType="Thumb">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="#484849" CornerRadius="4" Margin="2"/>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
+  <ControlTheme x:Key="{x:Type ScrollBar}" TargetType="ScrollBar">
+    <Setter Property="Background" Value="{StaticResource BgSecondary}"/>
+    <Style Selector="^:vertical">
+      <Setter Property="Width" Value="11"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}">
+            <Track Name="PART_Track" Orientation="Vertical" IsDirectionReversed="True"
+                   Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}"
+                   Value="{TemplateBinding Value, Mode=TwoWay}" ViewportSize="{TemplateBinding ViewportSize}">
+              <Track.DecreaseButton>
+                <RepeatButton Opacity="0" Focusable="False">
+                  <RepeatButton.Template><ControlTemplate><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template>
+                </RepeatButton>
+              </Track.DecreaseButton>
+              <Track.IncreaseButton>
+                <RepeatButton Opacity="0" Focusable="False">
+                  <RepeatButton.Template><ControlTemplate><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template>
+                </RepeatButton>
+              </Track.IncreaseButton>
+              <Track.Thumb><Thumb Theme="{StaticResource EmuScrollBarThumb}"/></Track.Thumb>
+            </Track>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="^:horizontal">
+      <Setter Property="Height" Value="11"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}">
+            <Track Name="PART_Track" Orientation="Horizontal"
+                   Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}"
+                   Value="{TemplateBinding Value, Mode=TwoWay}" ViewportSize="{TemplateBinding ViewportSize}">
+              <Track.DecreaseButton>
+                <RepeatButton Opacity="0" Focusable="False">
+                  <RepeatButton.Template><ControlTemplate><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template>
+                </RepeatButton>
+              </Track.DecreaseButton>
+              <Track.IncreaseButton>
+                <RepeatButton Opacity="0" Focusable="False">
+                  <RepeatButton.Template><ControlTemplate><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template>
+                </RepeatButton>
+              </Track.IncreaseButton>
+              <Track.Thumb><Thumb Theme="{StaticResource EmuScrollBarThumb}"/></Track.Thumb>
+            </Track>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+  </ControlTheme>
+
   <!-- TabControl: dark strip (BgSecondary) above, dark content (BgPrimary) below, no white border. -->
   <ControlTheme x:Key="{x:Type TabControl}" TargetType="TabControl">
     <Setter Property="Background" Value="{StaticResource BgPrimary}"/>
