@@ -78,9 +78,8 @@ public sealed class LibretroCore : IDisposable
         _handle = NativeMethods.LoadLibraryEx(corePath, 0, NativeMethods.LOAD_WITH_ALTERED_SEARCH_PATH);
         if (_handle == 0)
         {
-            int err = Marshal.GetLastWin32Error();
             throw new InvalidOperationException(
-                $"Failed to load core '{corePath}' (Win32 error {err}).");
+                $"Failed to load core '{corePath}'. {NativeMethods.LastError}".TrimEnd());
         }
 
         _init = Bind<RetroInit>("retro_init");

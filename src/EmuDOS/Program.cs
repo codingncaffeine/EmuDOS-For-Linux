@@ -9,7 +9,16 @@ sealed class Program
     // SynchronizationContext-reliant code before AppMain is called: things aren't initialized yet.
     [STAThread]
     public static void Main(string[] args)
-        => BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    {
+        // Headless host validation (no Avalonia/window): EmuDOS --selftest-core <core.so>.
+        if (args is ["--selftest-core", var corePath, ..])
+        {
+            Environment.Exit(EmuDOS.Services.CoreSelfTest.Run(corePath));
+            return;
+        }
+
+        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    }
 
     // Avalonia configuration, don't remove; also used by the visual designer.
     // X11 + Skia explicitly (Linux target). We don't reference Avalonia.Desktop — see the
