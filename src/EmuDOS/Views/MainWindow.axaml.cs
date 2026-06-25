@@ -592,7 +592,10 @@ public partial class MainWindow : Window
             Vm!.DeleteGames(games);
     }
 
-    // ── Drag-and-drop import (files onto the window) ─────────────────────────────────────────
+    // ── Drag-and-drop: a single image onto a box sets its cover; anything else imports ──────────
+    private static readonly string[] ImageExtensions = [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"];
+    private static bool IsImageFile(string path) => ImageExtensions.Contains(Path.GetExtension(path).ToLowerInvariant());
+
     private async void OnDrop(object? sender, DragEventArgs e)
     {
         if (Vm is null || e.DataTransfer?.Contains(DataFormat.File) != true)
@@ -601,9 +604,34 @@ public partial class MainWindow : Window
         if (items is null)
             return;
         var paths = items.Select(i => i.TryGetLocalPath()).Where(p => !string.IsNullOrEmpty(p)).Cast<string>().ToArray();
-        if (paths.Length > 0)
-            await Vm.HandleDropAsync(paths);
+        if (paths.Length == 0)
+            return;
         e.Handled = true;
+
+        // A single image dropped onto a box sets that box's cover (browser-dragged image URLs are a
+        // gap until the Avalonia DataTransfer text/URL formats are wired — notes/PHASE4-BACKLOG.md §A).
+        if (paths.Length == 1 && IsImageFile(paths[0]) && TileAt(e.GetPosition(this)) is { } tile)
+        {
+            Vm.Report($"Adding box art for {tile.Title}…", busy: true);
+            try { Vm.SetBoxArt(tile, await File.ReadAllBytesAsync(paths[0])); }
+            catch { Vm.Report("Couldn't read the dropped image.", busy: false); }
+            return;
+        }
+
+        await Vm.HandleDropAsync(paths);
+    }
+
+    // The game tile under a point (drop target), or null over empty shelf.
+    private GameTile? TileAt(Point p)
+    {
+        var hit = this.InputHitTest(p) as Visual;
+        while (hit is not null)
+        {
+            if (hit is Control { DataContext: GameTile t })
+                return t;
+            hit = hit.GetVisualParent();
+        }
+        return null;
     }
 
     private void OnDragOver(object? sender, DragEventArgs e)
