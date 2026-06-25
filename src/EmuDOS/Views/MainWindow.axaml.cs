@@ -42,7 +42,14 @@ public partial class MainWindow : Window
         InitializeComponent();
         AddHandler(DragDrop.DropEvent, OnDrop);
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
+        // Click anywhere in the app (the shelf) to dismiss an open detail card — same as its ✕/Esc.
+        // Tunnel so it fires before the box handlers; the card is a separate window, so clicks inside
+        // it don't reach here. The card opens on pointer-release, so this press-time close never races
+        // it (clicking a different box closes the old card, then release opens the new one).
+        AddHandler(PointerPressedEvent, OnGlobalPointerPressed, RoutingStrategies.Tunnel);
     }
+
+    private void OnGlobalPointerPressed(object? sender, PointerPressedEventArgs e) => _openCard?.Close();
 
     private MainViewModel? Vm => DataContext as MainViewModel;
 
