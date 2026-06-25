@@ -135,10 +135,21 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
         Closing += OnClosing;
     }
 
+    private bool _firstLaunchHintShown;
+
     private void OnLoaded(object? sender, EventArgs e)
     {
         _session.Start();
         Focus();
+
+        // A freshly-imported CD boots to DOS with the disc on D: — tell the user how to install.
+        if (!_firstLaunchHintShown
+            && string.IsNullOrWhiteSpace(_instance.Profile.Launch.Executable)
+            && _instance.Profile.Launch.PreCommands.Any(c => c.Contains("IMGMOUNT", StringComparison.OrdinalIgnoreCase)))
+        {
+            _firstLaunchHintShown = true;
+            ShowHint("Disc mounted as D:  —  type  D:  then run the installer (SETUP or INSTALL)", 7);
+        }
 
         _fpsTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _fpsTimer.Tick += (_, _) =>
