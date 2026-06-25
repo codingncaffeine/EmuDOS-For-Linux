@@ -67,4 +67,19 @@
           DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true"
           Condition="'$(PublishDir)' != ''" />
   </Target>
+
+  <!-- Fetch the prebuilt librashader runtime (CRT/slang shader engine, MPL-2.0/GPL-3.0) and ship it
+       next to the app binaries, where the shader loader finds it — so users never install a separate
+       package. fetch.sh pulls a version-pinned, SHA-256-verified .so; no committed binary. -->
+  <Target Name="FetchAndCopyLibrashader" AfterTargets="Build;Publish"
+          Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+    <Exec Command="bash &quot;$(MSBuildThisFileDirectory)../native/librashader/fetch.sh&quot;"
+          Condition="!Exists('$(MSBuildThisFileDirectory)../native/librashader/librashader.so')" />
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)../native/librashader/librashader.so"
+          DestinationFolder="$(OutDir)" SkipUnchangedFiles="true"
+          Condition="'$(OutDir)' != '' And Exists('$(MSBuildThisFileDirectory)../native/librashader/librashader.so')" />
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)../native/librashader/librashader.so"
+          DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true"
+          Condition="'$(PublishDir)' != '' And Exists('$(MSBuildThisFileDirectory)../native/librashader/librashader.so')" />
+  </Target>
 </Project>

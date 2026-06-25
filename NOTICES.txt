@@ -18,10 +18,14 @@ repository, satisfying the LGPL's relinking provision.
 
 librashader
 -----------
-CRT / post-processing shaders are rendered through librashader, loaded at
-runtime when present on the system (not bundled).
-  Copyright (c) the librashader authors.
-  Licensed under the Mozilla Public License 2.0.
+CRT / post-processing shaders are rendered through librashader by SnowflakePowered,
+which is BUNDLED with EmuDOS (librashader.so ships next to the binary) so shaders work
+out of the box. The version-pinned binary is fetched + SHA-256-verified by
+src/native/librashader/fetch.sh at build time (no committed binary).
+  Copyright (c) the librashader authors / SnowflakePowered.
+  Dual-licensed under the Mozilla Public License 2.0 and the GNU General Public
+  License v3.0 (both compatible with EmuDOS's GPLv3). See the full texts in
+  src/native/librashader/LICENSE-MPL.md and LICENSE-GPL.md.
   https://github.com/SnowflakePowered/librashader
 
 DOSBox Pure (libretro core)

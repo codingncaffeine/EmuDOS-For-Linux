@@ -114,7 +114,12 @@ internal static class LibrashaderInterop
         if (!string.IsNullOrWhiteSpace(preferredPath) && File.Exists(preferredPath)
             && NativeLibrary.TryLoad(preferredPath, out handle))
             return true;
-        // System fallback (distro package): librashader.so on the loader path.
+        // Bundled runtime: librashader.so ships next to the EmuDOS binary (FetchAndCopyLibrashader),
+        // so shaders work out of the box without installing anything.
+        var bundled = Path.Combine(AppContext.BaseDirectory, "librashader.so");
+        if (File.Exists(bundled) && NativeLibrary.TryLoad(bundled, out handle))
+            return true;
+        // Last resort: a system-installed librashader.so on the loader path.
         foreach (var name in new[] { "librashader.so", "libobs-librashader.so", "librashader" })
             if (NativeLibrary.TryLoad(name, out handle))
                 return true;
