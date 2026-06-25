@@ -1,0 +1,25 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Emutastic black/grey palette (shared with EmuDOS) — exact hex parity with the Windows app. -->
+  <Color x:Key="BgPrimaryColor">#0F0F10</Color>
+  <Color x:Key="BgSecondaryColor">#181819</Color>
+  <Color x:Key="BgTertiaryColor">#1F1F21</Color>
+  <Color x:Key="BorderNormalColor">#2A2A2D</Color>
+  <Color x:Key="TextPrimaryColor">#F0F0F0</Color>
+  <Color x:Key="TextSecondaryColor">#8A8A90</Color>
+  <Color x:Key="AccentColor">#E03535</Color>
+
+  <SolidColorBrush x:Key="BgPrimary" Color="#0F0F10"/>
+  <SolidColorBrush x:Key="BgSecondary" Color="#181819"/>
+  <SolidColorBrush x:Key="BgTertiary" Color="#1F1F21"/>
+  <SolidColorBrush x:Key="BorderNormal" Color="#2A2A2D"/>
+  <SolidColorBrush x:Key="TextPrimary" Color="#F0F0F0"/>
+  <SolidColorBrush x:Key="TextSecondary" Color="#8A8A90"/>
+  <SolidColorBrush x:Key="Accent" Color="#E03535"/>
+  <SolidColorBrush x:Key="ButtonBg" Color="#2C2C2E"/>
+  <SolidColorBrush x:Key="ButtonBorder" Color="#3A3A3C"/>
+  <SolidColorBrush x:Key="ButtonHoverBg" Color="#3A3A3C"/>
+  <SolidColorBrush x:Key="ButtonPressedBg" Color="#1C1C1E"/>
+
+</ResourceDictionary>

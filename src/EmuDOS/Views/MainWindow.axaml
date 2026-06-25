@@ -1,16 +1,135 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:EmuDOS.ViewModels"
+        xmlns:controls="clr-namespace:EmuDOS.Controls"
         x:Class="EmuDOS.Views.MainWindow"
-        Width="1100" Height="720"
-        MinWidth="900" MinHeight="600"
-        Title="EmuDOS"
-        Background="#1a1a1a">
-  <!-- Phase 1 skeleton. The bookshelf library (ShelfPanel + GameTile) lands in Phase 2. -->
-  <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
-    <TextBlock Text="EmuDOS for Linux"
-               HorizontalAlignment="Center" Foreground="#e6e6e6"
-               FontSize="28" FontWeight="SemiBold" />
-    <TextBlock Text="skeleton — library shelf coming in Phase 2"
-               HorizontalAlignment="Center" Foreground="#8a8a8a" FontSize="14" />
-  </StackPanel>
+        x:DataType="vm:MainViewModel"
+        Title="EmuDOS" Height="840" Width="1458"
+        MinWidth="1458" MaxWidth="1458"
+        Icon="/Assets/EmuDOS.ico"
+        Background="{StaticResource BgPrimary}"
+        WindowStartupLocation="CenterScreen"
+        DragDrop.AllowDrop="True"
+        KeyDown="OnWindowKeyDown">
+
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <!-- The library: the bookcase, width locked, repeating vertically. The bookshelf fills at least
+         the viewport (so empty shelves always show) and grows as games are added. -->
+    <ScrollViewer Grid.Row="0" Name="Scroller"
+                  VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <Border Name="ShelfBg" Width="1425" HorizontalAlignment="Center" VerticalAlignment="Top"
+              MinHeight="{Binding #Scroller.Bounds.Height}">
+        <Border.Background>
+          <!-- bookshelf2.png is natively 1425×671, so Stretch=None + TileMode=Tile repeats it on the
+               exact calibration grid the ShelfPanel lays boxes onto. -->
+          <ImageBrush Source="/Assets/bookshelf2.png" TileMode="Tile" Stretch="None"
+                      AlignmentX="Left" AlignmentY="Top"/>
+        </Border.Background>
+        <Border.ContextMenu>
+          <!-- Library-wide actions (right-click empty shelf space). -->
+          <ContextMenu>
+            <MenuItem Header="Download missing art" Click="OnDownloadMissingArt"/>
+            <MenuItem Header="Download 3D box art (all games)" Click="OnDownload3DArtAll"/>
+            <MenuItem Header="Preferences…" Click="OnPreferences"/>
+          </ContextMenu>
+        </Border.ContextMenu>
+
+        <ItemsControl ItemsSource="{Binding Games}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <controls:ShelfPanel/>
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:GameTile">
+              <!-- Box sized to the cover's real aspect, so art fills it with no brown letterbox;
+                   the placeholder shows only when there's no art. -->
+              <Grid Width="{Binding BoxWidth}" Height="{Binding BoxHeight}"
+                    Cursor="Hand" ToolTip.Tip="{Binding Title}" Background="Transparent"
+                    PointerPressed="OnBoxPointerPressed"
+                    PointerMoved="OnBoxPointerMoved"
+                    PointerReleased="OnBoxPointerReleased"
+                    PointerEntered="OnBoxPointerEntered"
+                    PointerExited="OnBoxPointerExited"
+                    ContextRequested="OnBoxContextRequested">
+                <Grid.Effect>
+                  <DropShadowEffect BlurRadius="7" OffsetX="0" OffsetY="3" Color="Black" Opacity="0.55"/>
+                </Grid.Effect>
+                <!-- Brown placeholder shows ONLY when there's no cover, so a 3D box's transparent
+                     corners reveal the shelf wood behind instead of a brown rectangle. -->
+                <Border Background="#D9B98A" CornerRadius="2" BorderBrush="#3A2A1C" BorderThickness="1"
+                        IsVisible="{Binding !HasCover}">
+                  <TextBlock Text="{Binding Title}" TextWrapping="Wrap" TextAlignment="Center"
+                             Foreground="#2A1B10" FontSize="11" FontWeight="SemiBold" Margin="4"
+                             VerticalAlignment="Center"/>
+                </Border>
+                <Image Source="{Binding Cover}" Stretch="Fill"/>
+                <Border BorderBrush="#E03535" BorderThickness="3" CornerRadius="2" Background="#33E03535"
+                        IsVisible="{Binding IsSelected}"/>
+                <TextBlock Text="★" FontSize="15" Foreground="#E03535"
+                           HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,4,0"
+                           IsVisible="{Binding IsFavorite}">
+                  <TextBlock.Effect>
+                    <DropShadowEffect BlurRadius="3" OffsetX="0" OffsetY="1" Color="Black" Opacity="0.9"/>
+                  </TextBlock.Effect>
+                </TextBlock>
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </Border>
+    </ScrollViewer>
+
+    <!-- Library filter (Ctrl+F): a themed box over the shelf with search + genre/year/favorites. -->
+    <Border Grid.Row="0" VerticalAlignment="Top" HorizontalAlignment="Center" ZIndex="10"
+            Background="{StaticResource BgSecondary}" BorderBrush="#E03535" BorderThickness="1"
+            CornerRadius="6" Margin="0,10,0,0" Padding="10,8"
+            IsVisible="{Binding IsFilterOpen}">
+      <StackPanel Orientation="Horizontal">
+        <TextBlock Text="Filter" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"
+                   Margin="2,0,10,0" FontWeight="SemiBold"/>
+        <TextBox Name="FilterSearch" Width="200" VerticalAlignment="Center"
+                 Text="{Binding SearchText, Mode=TwoWay}"/>
+        <ComboBox Width="150" Margin="8,0,0,0" VerticalAlignment="Center"
+                  ItemsSource="{Binding Genres}" SelectedItem="{Binding SelectedGenre, Mode=TwoWay}"/>
+        <ComboBox Width="110" Margin="8,0,0,0" VerticalAlignment="Center"
+                  ItemsSource="{Binding Decades}" SelectedItem="{Binding SelectedDecade, Mode=TwoWay}"/>
+        <CheckBox Content="Favorites" Margin="10,0,0,0" VerticalAlignment="Center"
+                  Foreground="{StaticResource TextPrimary}" IsChecked="{Binding FavoritesOnly, Mode=TwoWay}"/>
+        <Button Content="✕" Margin="10,0,2,0" Padding="8,2" Click="OnCloseFilter"
+                Background="Transparent" Foreground="{StaticResource TextSecondary}" BorderThickness="0"
+                Cursor="Hand" ToolTip.Tip="Close (Esc)"/>
+      </StackPanel>
+    </Border>
+
+    <StackPanel Grid.Row="1">
+      <!-- Update notice: shown when a newer release is on GitHub; click to open the download. -->
+      <Button Command="{Binding InstallUpdateCommand}" Cursor="Hand" HorizontalAlignment="Stretch"
+              Padding="0" BorderThickness="0" Background="#E03535"
+              IsVisible="{Binding UpdateAvailable}">
+        <TextBlock Text="{Binding UpdateMessage}" Foreground="White" FontWeight="SemiBold"
+                   Margin="14,7" VerticalAlignment="Center"/>
+      </Button>
+
+      <!-- Status: hidden unless importing / downloading / a problem. -->
+      <Border Background="{StaticResource BgSecondary}" IsVisible="{Binding ShowStatus}">
+        <Grid Margin="14,6">
+          <TextBlock Text="{Binding Status}" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+          <ProgressBar Width="120" Height="6" IsIndeterminate="True"
+                       HorizontalAlignment="Right" IsVisible="{Binding IsBusy}"/>
+        </Grid>
+      </Border>
+
+      <!-- Cloud sync: its own line so launch art/metadata status doesn't clobber it. -->
+      <Border Background="{StaticResource BgSecondary}" Padding="14,5"
+              IsVisible="{Binding CloudSyncStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+        <TextBlock Text="{Binding CloudSyncStatus}" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+      </Border>
+    </StackPanel>
+  </Grid>
 </Window>
