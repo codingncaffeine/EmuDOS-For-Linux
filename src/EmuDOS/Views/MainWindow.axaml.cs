@@ -279,6 +279,10 @@ public partial class MainWindow : Window
             ("Read manual", () => _ = OpenManualAsync(tile)),
         };
 
+        var executables = BuildExecutableList(tile);
+        if (executables.Count > 0)
+            overflow.Add(("Choose program…", () => ChooseProgram(tile, executables)));
+
         _openCard = new GameDetailWindow(tile, services, () => _ = LaunchGameAsync(tile), overflow);
         _openCard.Closed += (s, _) => { if (ReferenceEquals(_openCard, s)) _openCard = null; };
         _openCard.Show(this);
@@ -311,6 +315,9 @@ public partial class MainWindow : Window
             catch { /* folder may have been removed */ }
         }));
         menu.Items.Add(Item("🖥  Open in DOS", () => _ = LaunchGameAsync(tile, bootToDos: true)));
+        var exeList = BuildExecutableList(tile);
+        if (exeList.Count > 0)
+            menu.Items.Add(Item("🎮  Choose program…", () => ChooseProgram(tile, exeList)));
 
         menu.Items.Add(new Separator());
         menu.Items.Add(Item("🖼  Download box art", () => _ = Vm?.DownloadArtAsync(tile)));
@@ -444,6 +451,129 @@ public partial class MainWindow : Window
             busy: false);
     }
 
+    // ── Smart executable picker (Choose program…) ────────────────────────────────────────────
+
+    private static readonly string[] ExecutableExtensions = [".exe", ".com", ".bat"];
+
+    /// <summary>The programs offered in the picker: ones the user knows about + a content scan +
+    /// anything installed on the persisted C: drive, with 3dfx builds floated to the top.</summary>
+    private List<string> BuildExecutableList(GameTile tile)
+    {
+        var executables = OrderedExecutables(
+            Services.Store.ReadState(tile.Game.GameboxPath),
+            ScanExecutables(Path.Combine(tile.Game.GameboxPath, "content")));
+        foreach (var installed in PureSave.ListInstalledExecutables(Path.Combine(tile.Game.GameboxPath, "saves")))
+            if (!executables.Contains(installed, StringComparer.OrdinalIgnoreCase))
+                executables.Add(installed);
+        return executables;
+    }
+
+    private async void ChooseProgram(GameTile tile, List<string> executables)
+    {
+        var services = Services;
+        var state = services.Store.ReadState(tile.Game.GameboxPath);
+        // Pre-select what we'd launch by default: the remembered exe, else the smart-detected game.
+        var current = string.IsNullOrWhiteSpace(state.LastExecutable)
+            ? BestGameExecutable(Path.Combine(tile.Game.GameboxPath, "content"), tile.Title)
+            : state.LastExecutable;
+
+        var exe = await ChooseProgramDialog.ShowAsync(this, tile.Title, executables, current);
+        if (exe is null)
+            return;
+
+        if (PureSave.IsInstalledPath(exe))
+        {
+            // A program installed on the persisted C: drive — pin it via AUTOBOOT.DBP so dosbox_pure
+            // boots straight into it with the disc still mounted as D: (CD checks / audio keep working).
+            PureSave.SetAutoBoot(Path.Combine(tile.Game.GameboxPath, "saves"), exe);
+            await LaunchGameAsync(tile);
+        }
+        else
+        {
+            await LaunchGameAsync(tile, executableOverride: exe); // remembers it (unless it's a setup tool)
+        }
+    }
+
+    /// <summary>A configuration/installer program, not the game — shouldn't become the default launch.</summary>
+    private static bool IsSetupLike(string executable)
+    {
+        var name = Path.GetFileNameWithoutExtension(executable).ToLowerInvariant();
+        return name.Contains("setup") || name.Contains("install") || name.Contains("config");
+    }
+
+    /// <summary>DOS-relative paths of runnable files under the content (minus the DOSBox wrapper).</summary>
+    private static List<string> ScanExecutables(string contentDir)
+    {
+        var found = new List<string>();
+        if (!Directory.Exists(contentDir))
+            return found;
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(contentDir, "*.*", SearchOption.AllDirectories))
+            {
+                if (!ExecutableExtensions.Contains(Path.GetExtension(file).ToLowerInvariant()))
+                    continue;
+                if (Core.Import.DosExecutables.IsRuntimeHelper(file))
+                    continue; // DOS extenders / the DOSBox wrapper aren't launch targets
+                found.Add(Path.GetRelativePath(contentDir, file).Replace('/', '\\'));
+            }
+        }
+        catch { /* best-effort scan */ }
+        return found;
+    }
+
+    /// <summary>The most likely game program among the content's executables — a name matching the
+    /// title, then a known launcher, then the largest exe — skipping installers and setup tools.</summary>
+    private static string? BestGameExecutable(string contentDir, string title)
+    {
+        var pick = BestGameExecutableCore(contentDir, title);
+        return pick is null ? null : Core.Import.DosExecutables.ResolveBatRedirect(contentDir, pick);
+    }
+
+    private static string? BestGameExecutableCore(string contentDir, string title)
+    {
+        var candidates = ScanExecutables(contentDir)
+            .Where(e => !IsSetupLike(e) && !Core.Import.DosExecutables.IsRuntimeHelper(e))
+            .ToList();
+        if (candidates.Count == 0)
+            return null;
+
+        var titled = candidates.FirstOrDefault(e => Core.Import.DosExecutables.TitleMatches(e, title));
+        if (titled is not null)
+            return titled;
+
+        var known = candidates.FirstOrDefault(Core.Import.DosExecutables.IsKnownLauncher);
+        if (known is not null)
+            return known;
+
+        static long Size(string p) { try { return new FileInfo(p).Length; } catch { return 0; } }
+        var best = candidates
+            .Select(e => (exe: e, size: Size(Path.Combine(contentDir, e)), util: Core.Import.DosExecutables.IsLikelyUtility(e)))
+            .OrderBy(x => x.util)
+            .ThenByDescending(x => x.size)
+            .FirstOrDefault();
+        return best.size > 0 ? best.exe : (candidates.FirstOrDefault(e => e.Contains('\\')) ?? candidates[0]);
+    }
+
+    private static List<string> OrderedExecutables(GameUserState state, List<string> scanned)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var ordered = new List<string>();
+        foreach (var exe in state.KnownExecutables.Concat(scanned))
+            if (!string.IsNullOrWhiteSpace(exe) && seen.Add(exe))
+                ordered.Add(exe);
+        // Float 3dfx/Glide executables to the top (stable sort keeps everything else in order).
+        return ordered.OrderByDescending(Is3dfxExecutable).ToList();
+    }
+
+    /// <summary>Heuristic: an executable likely built to use a 3dfx/Voodoo (Glide) card.</summary>
+    internal static bool Is3dfxExecutable(string path)
+    {
+        var name = Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
+        return name.Contains("3dfx") || name.Contains("glide") || name.Contains("voodoo")
+            || name.StartsWith("gl") || name.EndsWith("gl");
+    }
+
     private void DeleteSelected() =>
         DeleteGamesConfirmed(Vm?.Games.Where(g => g.IsSelected).ToList() ?? []);
 
@@ -526,7 +656,8 @@ public partial class MainWindow : Window
     /// executable picker, graduate-installed-game, and 3dfx hardware path are Phase 4 (backlog C/D);
     /// for now the gamebox's imported launch profile is used.
     /// </summary>
-    private async Task LaunchGameAsync(GameTile tile, bool bootToDos = false)
+    private async Task LaunchGameAsync(GameTile tile, bool bootToDos = false, string? executableOverride = null,
+                                       byte[]? loadState = null)
     {
         if (Vm is null)
             return;
@@ -548,7 +679,26 @@ public partial class MainWindow : Window
 
         var instance = services.Store.Resolve(tile.Game.GameboxPath);
 
-        // Ensure a folder game's bundled CD mounts as D: (covers games whose mount wasn't set up yet).
+        // One-time: a CD game whose whole install ended up in the writable overlay (.pure.zip) gets
+        // graduated to a folder layout, so tiny config saves write in place instead of rewriting the
+        // entire multi-hundred-MB overlay each time (the ~1s save hitch + cloud-sync bloat).
+        if (instance.Profile.SourceMedia == SourceMediaType.Iso)
+        {
+            Vm.Report($"Optimizing {tile.Title} for faster saves…", busy: true);
+            var graduated = await Task.Run(() => PureSave.GraduateInstalledGame(tile.Game.GameboxPath, instance.Profile));
+            if (graduated is not null)
+            {
+                services.Store.WriteProfile(tile.Game.GameboxPath, graduated);
+                if (!string.IsNullOrWhiteSpace(graduated.Launch.Executable))
+                    services.Store.WriteState(tile.Game.GameboxPath,
+                        services.Store.ReadState(tile.Game.GameboxPath).WithExecutable(graduated.Launch.Executable!));
+                instance = instance with { Profile = graduated };
+                Vm.Report($"Optimized {tile.Title} for faster saves.", busy: false);
+            }
+        }
+
+        // Ensure a folder game's bundled CD mounts as D: (covers freshly-graduated disc games and any
+        // folder game whose mount wasn't set up yet). Persist if it changed so it's a one-time cost.
         var withDisc = Core.Import.ImportPipeline.EnsureBundledDiscMounted(instance.Profile, instance.ContentPath);
         if (!ReferenceEquals(withDisc, instance.Profile))
         {
@@ -557,17 +707,45 @@ public partial class MainWindow : Window
         }
 
         if (bootToDos)
+        {
+            // No game launch — configure + drop to the C: prompt so the user can run the game's SETUP.
             instance = instance with { Profile = instance.Profile with { Launch = new LaunchSpec() } };
+        }
+        else
+        {
+            // Pick the executable. Order: an explicit Run/picker choice this launch, then a program the
+            // user deliberately picked before, then the last program run from DOS, then auto-detect
+            // (title / extender-launcher .bat / largest exe), then the configured guess.
+            var state = services.Store.ReadState(tile.Game.GameboxPath);
+            var configured = instance.Profile.Launch.Executable;
+            var chosen = executableOverride
+                ?? (state.ExecutableIsUserChoice ? state.LastExecutable : null)
+                ?? state.LastRunProgram
+                ?? BestGameExecutable(Path.Combine(tile.Game.GameboxPath, "content"), tile.Title)
+                ?? configured;
+
+            if (!string.Equals(chosen, configured, StringComparison.OrdinalIgnoreCase))
+                instance = instance with
+                {
+                    Profile = instance.Profile with { Launch = instance.Profile.Launch with { Executable = chosen } },
+                };
+
+            // Only an explicit Run-menu pick becomes the new default — and not a one-off setup program.
+            if (executableOverride is not null && !IsSetupLike(executableOverride))
+                services.Store.WriteState(tile.Game.GameboxPath, state.WithExecutable(executableOverride));
+        }
 
         // Folder games write in-game saves into content/; snapshot a baseline before play so the
         // Manage window and cloud sync can tell saves from the original game files.
         if (instance.Profile.SourceMedia != SourceMediaType.Iso)
             ContentBaseline.CaptureIfMissing(instance.ContentPath, instance.SavePath);
 
+        // 3dfx hardware rendering stays software for now — the offscreen EGL path is deferred
+        // (backlog C). The per-game/global 3dfx selection lights up once that lands.
         var engine = new DosBoxPureEngine(
             services.Downloads.InstalledPath(AssetManifest.DosBoxPure), services.Paths.SystemDir, hardware3dfx: false);
         services.Library.RecordPlay(tile.Id);
-        new EmulatorWindow(engine, instance, tile.Id).Show();
+        new EmulatorWindow(engine, instance, tile.Id, loadState).Show();
         Vm.ClearStatus();
         }
         catch (Exception ex)
