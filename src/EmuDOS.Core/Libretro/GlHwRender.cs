@@ -28,7 +28,7 @@ internal sealed class GlHwRender : IDisposable
     private GetProcAddressT? _getProcAddress;        // SET BY US — core calls it to resolve GL symbols
     private GCHandle _fbHandle, _paHandle;
 
-    private IntPtr _hwnd, _hdc, _hglrc;
+    private IntPtr _dpy, _ctx, _surface; // EGL display / context / pbuffer surface
     private uint _fboId, _fboTex, _fboDepth;
     private int _fboWidth = 640, _fboHeight = 480;
     private bool _coreProfile;
@@ -96,7 +96,7 @@ internal sealed class GlHwRender : IDisposable
     {
         if (!Active)
             return;
-        Gl.wglMakeCurrent(_hdc, _hglrc);
+        eglMakeCurrent(_dpy, _surface, _surface, _ctx);
         if (maxWidth > _fboWidth || maxHeight > _fboHeight)
             CreateFbo(Math.Max(maxWidth, _fboWidth), Math.Max(maxHeight, _fboHeight));
         Log($"calling context_reset (fbo {_fboWidth}x{_fboHeight})");
@@ -186,66 +186,78 @@ internal sealed class GlHwRender : IDisposable
         finally { Marshal.FreeHGlobal(buf); }
     }
 
+    // ── EGL context (Linux) ─────────────────────────────────────────────────────────────────────
+    private const int EGL_OPENGL_API = 0x30A2;
+    private const int EGL_OPENGL_BIT = 0x0008;
+    private const int EGL_RENDERABLE_TYPE = 0x3040;
+    private const int EGL_SURFACE_TYPE = 0x3033, EGL_PBUFFER_BIT = 0x0001;
+    private const int EGL_RED_SIZE = 0x3024, EGL_GREEN_SIZE = 0x3023, EGL_BLUE_SIZE = 0x3022, EGL_ALPHA_SIZE = 0x3021;
+    private const int EGL_DEPTH_SIZE = 0x3025, EGL_STENCIL_SIZE = 0x3026;
+    private const int EGL_NONE = 0x3038;
+    private const int EGL_WIDTH = 0x3057, EGL_HEIGHT = 0x3056;
+    private const int EGL_CONTEXT_MAJOR_VERSION = 0x3098, EGL_CONTEXT_MINOR_VERSION = 0x30FB;
+    private const int EGL_CONTEXT_OPENGL_PROFILE_MASK = 0x30FD;
+    private const int EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT = 0x0001, EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT = 0x0002;
+
+    [DllImport("libEGL.so.1")] private static extern IntPtr eglGetDisplay(IntPtr displayId);
+    [DllImport("libEGL.so.1")] private static extern uint eglInitialize(IntPtr dpy, out int major, out int minor);
+    [DllImport("libEGL.so.1")] private static extern uint eglBindAPI(uint api);
+    [DllImport("libEGL.so.1")] private static extern uint eglChooseConfig(IntPtr dpy, int[] attribs, IntPtr[] configs, int size, out int num);
+    [DllImport("libEGL.so.1")] private static extern IntPtr eglCreateContext(IntPtr dpy, IntPtr config, IntPtr share, int[] attribs);
+    [DllImport("libEGL.so.1")] private static extern IntPtr eglCreatePbufferSurface(IntPtr dpy, IntPtr config, int[] attribs);
+    [DllImport("libEGL.so.1")] private static extern uint eglMakeCurrent(IntPtr dpy, IntPtr draw, IntPtr read, IntPtr ctx);
+    [DllImport("libEGL.so.1")] private static extern IntPtr eglGetProcAddress([MarshalAs(UnmanagedType.LPStr)] string name);
+    [DllImport("libEGL.so.1")] private static extern uint eglDestroyContext(IntPtr dpy, IntPtr ctx);
+    [DllImport("libEGL.so.1")] private static extern uint eglDestroySurface(IntPtr dpy, IntPtr surface);
+    [DllImport("libEGL.so.1")] private static extern uint eglTerminate(IntPtr dpy);
+
     // ── Context + FBO ─────────────────────────────────────────────────────────────────────────
     private bool CreateContext()
     {
-        const uint WS_POPUP = 0x80000000;
-        const uint CS_OWNDC = 0x0020;
-        _wndProc = Gl.DefWindowProc; // keep alive
-        var wc = new Gl.WNDCLASSEX
+        try
         {
-            cbSize = (uint)Marshal.SizeOf<Gl.WNDCLASSEX>(),
-            style = CS_OWNDC,
-            lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_wndProc),
-            hInstance = Gl.GetModuleHandle(null),
-            lpszClassName = "EmuDosGlOffscreen",
-        };
-        Gl.RegisterClassEx(ref wc); // no-op if already registered
+            _dpy = eglGetDisplay(IntPtr.Zero); // EGL_DEFAULT_DISPLAY
+            if (_dpy == IntPtr.Zero || eglInitialize(_dpy, out _, out _) == 0) { Log("eglInitialize failed"); return false; }
+            if (eglBindAPI(EGL_OPENGL_API) == 0) { Log("eglBindAPI(GL) failed"); return false; }
 
-        _hwnd = Gl.CreateWindowEx(0, "EmuDosGlOffscreen", "GLOffscreen", WS_POPUP, 0, 0, 640, 480,
-            IntPtr.Zero, IntPtr.Zero, Gl.GetModuleHandle(null), IntPtr.Zero);
-        if (_hwnd == IntPtr.Zero) { Log("CreateWindowEx failed"); return false; }
-        _hdc = Gl.GetDC(_hwnd);
-        if (_hdc == IntPtr.Zero) { Log("GetDC failed"); return false; }
-
-        var pfd = new Gl.PIXELFORMATDESCRIPTOR
-        {
-            nSize = (ushort)Marshal.SizeOf<Gl.PIXELFORMATDESCRIPTOR>(),
-            nVersion = 1,
-            dwFlags = Gl.PFD_DRAW_TO_WINDOW | Gl.PFD_SUPPORT_OPENGL, // no double-buffer: we read an FBO
-            iPixelType = Gl.PFD_TYPE_RGBA,
-            cColorBits = 32,
-            cDepthBits = 24,
-            cStencilBits = 8,
-        };
-        int fmt = Gl.ChoosePixelFormat(_hdc, ref pfd);
-        if (fmt == 0 || !Gl.SetPixelFormat(_hdc, fmt, ref pfd)) { Log("Choose/SetPixelFormat failed"); return false; }
-
-        IntPtr dummy = Gl.wglCreateContext(_hdc);
-        if (dummy == IntPtr.Zero || !Gl.wglMakeCurrent(_hdc, dummy)) { Log("dummy context failed"); return false; }
-
-        var createAttribs = GetProc<Gl.WglCreateContextAttribsArb>("wglCreateContextAttribsARB");
-        if (createAttribs is null)
-        {
-            _hglrc = dummy;
-        }
-        else
-        {
-            int profile = _coreProfile ? Gl.WGL_CONTEXT_CORE_PROFILE_BIT_ARB : Gl.WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB;
-            int[] attribs = { Gl.WGL_CONTEXT_MAJOR_VERSION_ARB, 3, Gl.WGL_CONTEXT_MINOR_VERSION_ARB, 3,
-                              Gl.WGL_CONTEXT_PROFILE_MASK_ARB, profile, 0 };
-            _hglrc = createAttribs(_hdc, IntPtr.Zero, attribs);
-            if (_hglrc == IntPtr.Zero) // fall back to the other profile
+            int[] cfgAttribs =
             {
-                attribs[5] = _coreProfile ? Gl.WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB : Gl.WGL_CONTEXT_CORE_PROFILE_BIT_ARB;
-                _hglrc = createAttribs(_hdc, IntPtr.Zero, attribs);
+                EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
+                EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT,
+                EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8,
+                EGL_DEPTH_SIZE, 24, EGL_STENCIL_SIZE, 8,
+                EGL_NONE,
+            };
+            var configs = new IntPtr[1];
+            if (eglChooseConfig(_dpy, cfgAttribs, configs, 1, out int num) == 0 || num < 1) { Log("eglChooseConfig failed"); return false; }
+
+            int profileBit = _coreProfile ? EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT : EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT;
+            int[] ctxAttribs =
+            {
+                EGL_CONTEXT_MAJOR_VERSION, 3, EGL_CONTEXT_MINOR_VERSION, 3,
+                EGL_CONTEXT_OPENGL_PROFILE_MASK, profileBit,
+                EGL_NONE,
+            };
+            _ctx = eglCreateContext(_dpy, configs[0], IntPtr.Zero, ctxAttribs);
+            if (_ctx == IntPtr.Zero) // fall back to the other profile
+            {
+                ctxAttribs[5] = _coreProfile ? EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT : EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT;
+                _ctx = eglCreateContext(_dpy, configs[0], IntPtr.Zero, ctxAttribs);
             }
-            if (_hglrc == IntPtr.Zero) { _hglrc = dummy; }
-            else { Gl.wglMakeCurrent(IntPtr.Zero, IntPtr.Zero); Gl.wglDeleteContext(dummy); }
+            if (_ctx == IntPtr.Zero) { Log("eglCreateContext failed"); return false; }
+
+            int[] pbAttribs = { EGL_WIDTH, _fboWidth, EGL_HEIGHT, _fboHeight, EGL_NONE };
+            _surface = eglCreatePbufferSurface(_dpy, configs[0], pbAttribs);
+
+            if (eglMakeCurrent(_dpy, _surface, _surface, _ctx) == 0) { Log("eglMakeCurrent failed"); return false; }
+            Log($"EGL context ready (coreProfile={_coreProfile})");
+            return true;
         }
-        if (!Gl.wglMakeCurrent(_hdc, _hglrc)) { Log("final wglMakeCurrent failed"); return false; }
-        Log($"context ready hglrc=0x{_hglrc:X}");
-        return true;
+        catch (Exception ex)
+        {
+            Log("CreateContext (EGL): " + ex.Message);
+            return false;
+        }
     }
 
     private void CreateFbo(int width, int height)
@@ -277,23 +289,12 @@ internal sealed class GlHwRender : IDisposable
 
     private IntPtr ResolveProc(string sym)
     {
-        IntPtr p = Gl.wglGetProcAddress(sym);
-        if (p == IntPtr.Zero || (long)p is >= 1 and <= 3)
-        {
-            IntPtr lib = Gl.GetModuleHandle("opengl32.dll");
-            if (lib == IntPtr.Zero) lib = Gl.LoadLibrary("opengl32.dll");
-            if (lib != IntPtr.Zero) p = Gl.GetProcAddress(lib, sym);
-        }
+        IntPtr p = eglGetProcAddress(sym); // EGL 1.5 returns core + extension GL functions
+        if (p == IntPtr.Zero && NativeLibrary.TryLoad("libGL.so.1", out var gl))
+            NativeLibrary.TryGetExport(gl, sym, out p);
         return p;
     }
 
-    private T? GetProc<T>(string name) where T : class
-    {
-        IntPtr p = ResolveProc(name);
-        return p == IntPtr.Zero ? null : Marshal.GetDelegateForFunctionPointer<T>(p);
-    }
-
-    private Gl.WndProc? _wndProc;
     private void LoadGlFunctions() => Gl.Load(ResolveProc);
 
     private void DestroyFbo()
@@ -306,23 +307,26 @@ internal sealed class GlHwRender : IDisposable
 
     public void Dispose()
     {
-        if (!Active && _hglrc == IntPtr.Zero)
+        if (!Active && _ctx == IntPtr.Zero)
             return;
         try
         {
-            if (_hdc != IntPtr.Zero) Gl.wglMakeCurrent(_hdc, _hglrc);
+            if (_dpy != IntPtr.Zero) eglMakeCurrent(_dpy, _surface, _surface, _ctx);
             try { _coreContextDestroy?.Invoke(); } catch (Exception ex) { Log("context_destroy threw: " + ex.Message); }
             DestroyFbo();
-            Gl.wglMakeCurrent(IntPtr.Zero, IntPtr.Zero);
-            if (_hglrc != IntPtr.Zero) Gl.wglDeleteContext(_hglrc);
-            if (_hwnd != IntPtr.Zero && _hdc != IntPtr.Zero) Gl.ReleaseDC(_hwnd, _hdc);
-            if (_hwnd != IntPtr.Zero) Gl.DestroyWindow(_hwnd);
+            if (_dpy != IntPtr.Zero)
+            {
+                eglMakeCurrent(_dpy, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+                if (_surface != IntPtr.Zero) eglDestroySurface(_dpy, _surface);
+                if (_ctx != IntPtr.Zero) eglDestroyContext(_dpy, _ctx);
+                eglTerminate(_dpy);
+            }
         }
         catch (Exception ex) { Log("teardown: " + ex.Message); }
         if (_readback != IntPtr.Zero) { Marshal.FreeHGlobal(_readback); _readback = IntPtr.Zero; }
         if (_fbHandle.IsAllocated) _fbHandle.Free();
         if (_paHandle.IsAllocated) _paHandle.Free();
-        _hglrc = _hdc = _hwnd = IntPtr.Zero;
+        _ctx = _surface = _dpy = IntPtr.Zero;
         Active = false;
     }
 }

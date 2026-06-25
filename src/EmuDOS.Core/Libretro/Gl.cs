@@ -34,28 +34,37 @@ internal static class Gl
     public delegate IntPtr WndProc(IntPtr hwnd, uint msg, IntPtr w, IntPtr l);
     public delegate IntPtr WglCreateContextAttribsArb(IntPtr hdc, IntPtr share, int[] attribs);
 
-    // ── GL 1.1 (direct exports) ────────────────────────────────────────────────────────────────
-    [DllImport("opengl32.dll")] public static extern void glReadPixels(int x, int y, int w, int h, uint format, uint type, IntPtr pixels);
-    [DllImport("opengl32.dll")] public static extern void glGenTextures(int n, uint[] ids);
-    [DllImport("opengl32.dll")] public static extern void glBindTexture(uint target, uint texture);
-    [DllImport("opengl32.dll")] public static extern void glDeleteTextures(int n, uint[] ids);
-    [DllImport("opengl32.dll")] public static extern void glTexImage2D(uint target, int level, int internalFormat, int w, int h, int border, uint format, uint type, IntPtr data);
-    [DllImport("opengl32.dll")] public static extern void glTexParameteri(uint target, uint pname, int param);
-
-    // ── FBO/renderbuffer extensions (resolved via Load) ──────────────────────────────────────────
+    // ── GL 1.1 core + FBO/renderbuffer extensions — ALL resolved via Load(). The Windows build could
+    //    DllImport the 1.1 core functions from opengl32.dll directly, but on Linux glReadPixels et al.
+    //    live in libGL and are resolved through eglGetProcAddress (EGL 1.5 returns core functions), so
+    //    everything goes through the loader for portability. ──────────────────────────────────────
     private delegate void GenDel(int n, uint[] ids);
     private delegate void BindDel(uint target, uint id);
     private delegate void FbTex2DDel(uint target, uint attachment, uint textarget, uint texture, int level);
     private delegate void RbStorageDel(uint target, uint internalFormat, int w, int h);
     private delegate void FbRbDel(uint target, uint attachment, uint rbTarget, uint rb);
     private delegate uint CheckDel(uint target);
+    private delegate void ReadPixelsDel(int x, int y, int w, int h, uint format, uint type, IntPtr pixels);
+    private delegate void TexImage2DDel(uint target, int level, int internalFormat, int w, int h, int border, uint format, uint type, IntPtr data);
+    private delegate void TexParameteriDel(uint target, uint pname, int param);
 
-    private static GenDel? _genFbo, _genRb, _delFbo, _delRb;
+    private static GenDel? _genFbo, _genRb, _delFbo, _delRb, _genTex, _delTex;
     private static BindDel? _bindFbo, _bindRb;
     private static FbTex2DDel? _fbTex2D;
     private static RbStorageDel? _rbStorage;
     private static FbRbDel? _fbRb;
     private static CheckDel? _checkFbo;
+    private static ReadPixelsDel? _readPixels;
+    private static BindDel? _bindTex;
+    private static TexImage2DDel? _texImage2D;
+    private static TexParameteriDel? _texParameteri;
+
+    public static void glReadPixels(int x, int y, int w, int h, uint format, uint type, IntPtr pixels) => _readPixels?.Invoke(x, y, w, h, format, type, pixels);
+    public static void glGenTextures(int n, uint[] ids) => _genTex?.Invoke(n, ids);
+    public static void glBindTexture(uint target, uint texture) => _bindTex?.Invoke(target, texture);
+    public static void glDeleteTextures(int n, uint[] ids) => _delTex?.Invoke(n, ids);
+    public static void glTexImage2D(uint target, int level, int internalFormat, int w, int h, int border, uint format, uint type, IntPtr data) => _texImage2D?.Invoke(target, level, internalFormat, w, h, border, format, type, data);
+    public static void glTexParameteri(uint target, uint pname, int param) => _texParameteri?.Invoke(target, pname, param);
 
     public static void Load(Func<string, IntPtr> resolve)
     {
@@ -64,6 +73,12 @@ internal static class Gl
             IntPtr p = resolve(name);
             return p == IntPtr.Zero ? null : Marshal.GetDelegateForFunctionPointer<T>(p);
         }
+        _readPixels = R<ReadPixelsDel>("glReadPixels");
+        _genTex = R<GenDel>("glGenTextures");
+        _bindTex = R<BindDel>("glBindTexture");
+        _delTex = R<GenDel>("glDeleteTextures");
+        _texImage2D = R<TexImage2DDel>("glTexImage2D");
+        _texParameteri = R<TexParameteriDel>("glTexParameteri");
         _genFbo = R<GenDel>("glGenFramebuffers");
         _bindFbo = R<BindDel>("glBindFramebuffer");
         _fbTex2D = R<FbTex2DDel>("glFramebufferTexture2D");
