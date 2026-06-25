@@ -807,8 +807,15 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
     // the per-game preset is already read/persisted so it lights up once the renderer is wired.
     private void CycleShader() => ShowHint("CRT shaders — coming soon");
 
-    // The cheat engine UI (CheatWindow) lands with the secondary windows (backlog A).
-    private void OpenCheats() => ShowHint("Cheats — coming soon");
+    // The cheat engine UI — scans/edits/freezes the live game's memory over this session.
+    private CheatWindow? _cheatWindow;
+    private void OpenCheats()
+    {
+        if (_cheatWindow is not null) { _cheatWindow.Activate(); return; }
+        _cheatWindow = new CheatWindow(_session);
+        _cheatWindow.Closed += (_, _) => _cheatWindow = null;
+        _cheatWindow.Show();
+    }
 
     private static string SafeName(string title) =>
         string.Concat(title.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)).Trim();
