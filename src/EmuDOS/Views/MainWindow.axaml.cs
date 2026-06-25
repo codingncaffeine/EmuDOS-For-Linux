@@ -48,10 +48,6 @@ public partial class MainWindow : Window
 
     private AppServices Services => ((App)Application.Current!).Services;
 
-    // Actions that need a window/engine ported in a later phase show a clear status note for now.
-    private void ComingSoon(string what) =>
-        Vm?.Report($"{what} — lands in a later port phase.", busy: false);
-
     // ── Library-wide actions (right-click empty shelf) ───────────────────────────────────────
     private void OnPreferences(object? sender, RoutedEventArgs e) => OpenPreferences(null);
 
