@@ -6,7 +6,7 @@
         x:DataType="vm:MainViewModel"
         Title="EmuDOS" Height="840" Width="1458"
         MinWidth="1458" MaxWidth="1458"
-        Icon="/Assets/EmuDOS.ico"
+        Icon="/Assets/emudos-linux.png"
         Background="{StaticResource BgPrimary}"
         WindowStartupLocation="CenterScreen"
         DragDrop.AllowDrop="True"

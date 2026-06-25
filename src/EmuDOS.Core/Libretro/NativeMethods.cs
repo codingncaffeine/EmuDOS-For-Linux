@@ -3,24 +3,46 @@ using System.Runtime.InteropServices;
 namespace EmuDOS.Core.Libretro;
 
 /// <summary>
-/// Win32 module loading. Uses <c>LoadLibraryEx</c> with <c>LOAD_WITH_ALTERED_SEARCH_PATH</c>
-/// so a core's own directory is searched first for its dependent DLLs — letting a core ship
-/// sibling runtime DLLs without polluting the app directory.
+/// Cross-platform native module loading for the libretro core. Uses .NET's built-in
+/// <see cref="NativeLibrary"/> (dlopen/dlsym on Linux, LoadLibrary/GetProcAddress on Windows), so the
+/// same host code loads a <c>.so</c> here and a <c>.dll</c> on Windows. A core's sibling runtime
+/// libraries (if any) are resolved by the platform loader from its own directory via RPATH /
+/// LD_LIBRARY_PATH; dosbox_pure is self-contained, so no altered search path is needed.
 /// </summary>
-internal static partial class NativeMethods
+internal static class NativeMethods
 {
+    // Kept for source compatibility with the Windows host; ignored on Linux (the dynamic loader uses
+    // RPATH / LD_LIBRARY_PATH rather than a per-call search-path flag).
     public const uint LOAD_WITH_ALTERED_SEARCH_PATH = 0x00000008;
 
-    // LibraryImport (unlike DllImport) does not auto-append the W/A suffix, so name the
-    // Unicode export explicitly.
-    [LibraryImport("kernel32.dll", EntryPoint = "LoadLibraryExW", SetLastError = true,
-        StringMarshalling = StringMarshalling.Utf16)]
-    public static partial nint LoadLibraryEx(string lpFileName, nint hFile, uint dwFlags);
+    /// <summary>The error string from the most recent failed <see cref="LoadLibraryEx"/> — the Linux
+    /// analog of GetLastWin32Error (dlopen's message).</summary>
+    public static string? LastError { get; private set; }
 
-    [LibraryImport("kernel32.dll", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
-    public static partial nint GetProcAddress(nint hModule, string lpProcName);
+    /// <summary>Load a native module, or 0 on failure (with <see cref="LastError"/> set).</summary>
+    public static nint LoadLibraryEx(string lpFileName, nint hFile, uint dwFlags)
+    {
+        try
+        {
+            LastError = null;
+            return NativeLibrary.Load(lpFileName);
+        }
+        catch (Exception ex)
+        {
+            LastError = ex.Message;
+            return 0;
+        }
+    }
 
-    [LibraryImport("kernel32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static partial bool FreeLibrary(nint hModule);
+    /// <summary>Resolve an exported symbol, or 0 if it isn't present.</summary>
+    public static nint GetProcAddress(nint hModule, string lpProcName) =>
+        NativeLibrary.TryGetExport(hModule, lpProcName, out var addr) ? addr : 0;
+
+    /// <summary>Unload a native module.</summary>
+    public static bool FreeLibrary(nint hModule)
+    {
+        if (hModule != 0)
+            NativeLibrary.Free(hModule);
+        return true;
+    }
 }
