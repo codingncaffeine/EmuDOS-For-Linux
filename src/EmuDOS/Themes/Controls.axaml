@@ -28,7 +28,7 @@
                             ContentTemplate="{TemplateBinding ContentTemplate}"
                             HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
                             VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
-                            Margin="{TemplateBinding Padding}"/>
+                            Padding="{TemplateBinding Padding}"/>
         </Border>
       </ControlTemplate>
     </Setter>
