@@ -9,7 +9,7 @@ namespace EmuDOS.Core.Input;
 /// d-pad and triggers act as L2/R2. <see cref="Poll"/> latches a snapshot once per frame on the
 /// emulation thread; <see cref="IsButtonDown"/> reads it.
 /// </summary>
-public sealed class XInputController
+public sealed class XInputController : IGamepadInput
 {
     [StructLayout(LayoutKind.Sequential)]
     private struct Gamepad
