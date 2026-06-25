@@ -79,8 +79,9 @@ public sealed class AppServices
     public async Task<(bool Ok, int MaxThreads)> ValidateScreenScraperAsync(string user, string password)
     {
         var result = await new ScreenScraperClient(_screenScraperHttp, user, password).ValidateLoginAsync();
-        SnapsLog.Info($"ScreenScraper login test for '{user}': {(result.Ok ? "SUCCESS" : "FAILED")} (maxthreads={result.MaxThreads})");
-        return result;
+        SnapsLog.Info($"ScreenScraper login test for '{user}': {(result.Ok ? "SUCCESS" : "FAILED")} "
+                      + $"(maxthreads={result.MaxThreads}; {result.Detail})");
+        return (result.Ok, result.MaxThreads);
     }
 
     /// <summary>Verify a SteamGridDB API key; logs the result.</summary>

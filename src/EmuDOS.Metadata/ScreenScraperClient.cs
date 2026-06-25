@@ -193,34 +193,78 @@ public sealed partial class ScreenScraperClient
 
     /// <summary>
     /// Verify the configured user login (with the dev creds) via <c>ssuserInfos.php</c>.
-    /// Returns whether the account is recognised and its <c>maxthreads</c> allowance — the number
-    /// of concurrent API requests the account may make (paid tiers get more; free/anonymous = 1).
+    /// Returns whether the account is recognised, its <c>maxthreads</c> allowance (the number of
+    /// concurrent API requests the account may make — paid tiers get more; free/anonymous = 1), and a
+    /// short <c>Detail</c> string for the log. ScreenScraper's API flakes (503 / overload / non-JSON
+    /// blips), so transient failures are retried a few times before reporting a real failure — that's
+    /// what kept a perfectly good login intermittently showing "failed".
     /// </summary>
-    public async Task<(bool Ok, int MaxThreads)> ValidateLoginAsync(CancellationToken cancellationToken = default)
+    public async Task<(bool Ok, int MaxThreads, string Detail)> ValidateLoginAsync(CancellationToken cancellationToken = default)
     {
+        const int attempts = 3;
+        string detail = "no response";
+        for (int attempt = 1; attempt <= attempts; attempt++)
+        {
+            try
+            {
+                using var response = await _http.GetAsync($"{BaseUrl}ssuserInfos.php?{Auth()}", cancellationToken);
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    // 401/403 = real credential rejection (don't retry); others (429/503/5xx) are transient.
+                    detail = $"HTTP {(int)response.StatusCode} {Snippet(body)}";
+                    if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized
+                                            or System.Net.HttpStatusCode.Forbidden)
+                        return (false, 1, detail);
+                }
+                else if (TryParseUser(body, out var maxThreads))
+                {
+                    return (true, maxThreads, attempt == 1 ? "ok" : $"ok (after {attempt} tries)");
+                }
+                else
+                {
+                    // 200 but no ssuser node — usually a server-busy / non-JSON page; transient.
+                    detail = $"unrecognised response {Snippet(body)}";
+                }
+            }
+            catch (Exception ex)
+            {
+                detail = $"{ex.GetType().Name}: {ex.Message}";
+            }
+
+            if (attempt < attempts)
+                await Task.Delay(700 * attempt, cancellationToken); // brief backoff before retrying
+        }
+        return (false, 1, $"failed after {attempts} tries — {detail}");
+    }
+
+    private static bool TryParseUser(string body, out int maxThreads)
+    {
+        maxThreads = 1;
         try
         {
-            using var response = await _http.GetAsync($"{BaseUrl}ssuserInfos.php?{Auth()}", cancellationToken);
-            if (!response.IsSuccessStatusCode)
-                return (false, 1);
-
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
-            var doc = JsonNode.Parse(body);
-            var ssuser = doc?["response"]?["ssuser"] ?? doc?["ssuser"];
+            var ssuser = JsonNode.Parse(body)?["response"]?["ssuser"] ?? JsonNode.Parse(body)?["ssuser"];
             if (ssuser is null)
-                return (false, 1);
-
+                return false;
             // ScreenScraper returns maxthreads as a string; be tolerant of a numeric node too.
-            var maxThreads = 1;
             if (ssuser["maxthreads"] is { } node && int.TryParse(node.ToString(), out var parsed) && parsed > 0)
                 maxThreads = parsed;
-
-            return (true, maxThreads);
+            return true;
         }
         catch
         {
-            return (false, 1);
+            return false; // not JSON (an HTML/plain-text error page) — transient
         }
+    }
+
+    // First line of a response body, trimmed, for the log (ScreenScraper error pages are short text).
+    private static string Snippet(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+            return string.Empty;
+        var line = body.Trim().Split('\n', 2)[0].Trim();
+        return line.Length > 120 ? "— " + line[..120] : "— " + line;
     }
 
     /// <summary>Download an image URL to bytes, or null on failure.</summary>
