@@ -23,7 +23,7 @@ public partial class App : Application
         }
 
         CrashLog.Install();            // record unhandled exceptions (incl. failures during startup below)
-        UpdateService.CleanupOldFiles(); // sweep .old/.new left by a previous self-update (no-op until Phase 4/5)
+        UpdateService.CleanupOldFiles(); // sweep a leftover .update-staging from an interrupted self-update
         Services = new AppServices();
         Core.Audio.Mt32Synth.RegisterNativeResolver(Services.Paths.CoresDir);
 
