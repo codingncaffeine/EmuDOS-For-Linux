@@ -7,18 +7,19 @@ namespace EmuDOS.Core.Downloads;
 /// </summary>
 public static class AssetManifest
 {
-    public const string DosBoxPureFileName = "dosbox_pure_libretro.dll";
+    public const string DosBoxPureFileName = "dosbox_pure_libretro.so";
     public const string CatalogFileName = "catalog.db";
 
-    private const string ReleaseBase = "https://github.com/codingncaffeine/EmuDOS/releases/latest/download";
+    private const string ReleaseBase = "https://github.com/codingncaffeine/EmuDOS-For-Linux/releases/latest/download";
 
-    /// <summary>The dosbox_pure libretro core (Windows x86-64).</summary>
+    /// <summary>The dosbox_pure libretro core (Linux x86-64) — same buildbot lineup as the Windows
+    /// app, fetched as a .so instead of a .dll.</summary>
     public static DownloadAsset DosBoxPure { get; } = new()
     {
         Id = "dosbox_pure",
         DisplayName = "DOSBox Pure core",
         Description = "The DOS emulator that runs your games. Required.",
-        Url = "https://buildbot.libretro.com/nightly/windows/x86_64/latest/dosbox_pure_libretro.dll.zip",
+        Url = "https://buildbot.libretro.com/nightly/linux/x86_64/latest/dosbox_pure_libretro.so.zip",
         Kind = DownloadKind.ZippedCore,
         FileName = DosBoxPureFileName,
         Category = AssetCategory.Core,
