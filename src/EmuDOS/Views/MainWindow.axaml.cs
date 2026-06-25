@@ -53,7 +53,14 @@ public partial class MainWindow : Window
         Vm?.Report($"{what} — lands in a later port phase.", busy: false);
 
     // ── Library-wide actions (right-click empty shelf) ───────────────────────────────────────
-    private void OnPreferences(object? sender, RoutedEventArgs e) => ComingSoon("Preferences");
+    private void OnPreferences(object? sender, RoutedEventArgs e) => OpenPreferences(null);
+
+    /// <summary>Opens the tabbed Preferences. Pass a tile to land on its per-game "Game Options" tab.</summary>
+    private void OpenPreferences(GameTile? game)
+    {
+        var prefs = new PreferencesWindow(Services, game);
+        prefs.Show(this);
+    }
 
     private async void OnDownloadMissingArt(object? sender, RoutedEventArgs e)
     {
@@ -273,7 +280,7 @@ public partial class MainWindow : Window
             ("Manage…", () => OpenManage(tile)),
             ("Rename from ScreenScraper…", () => RenameFromScreenScraper(tile)),
             ("Cheats… (preview)", () => ComingSoon("Cheats")),
-            ("Game preferences…", () => ComingSoon("Game preferences")),
+            ("Game preferences…", () => OpenPreferences(tile)),
             ("Open in DOS", () => _ = LaunchGameAsync(tile, bootToDos: true)),
             ("Launch parameters…", () => EditLaunchParameters(tile)),
             ("Read manual", () => _ = OpenManualAsync(tile)),
@@ -307,7 +314,7 @@ public partial class MainWindow : Window
         menu.Items.Add(favorite);
 
         menu.Items.Add(new Separator());
-        menu.Items.Add(Item("⚙  Preferences", () => ComingSoon("Game preferences")));
+        menu.Items.Add(Item("⚙  Preferences", () => OpenPreferences(tile)));
         menu.Items.Add(Item("🛠  Manage…", () => OpenManage(tile)));
         menu.Items.Add(Item("📂  Open game folder", () =>
         {
@@ -689,6 +696,9 @@ public partial class MainWindow : Window
         if (Vm?.Games.Count > 0)
             OpenGameCard(Vm.Games[0]);
     }
+
+    /// <summary>Open Preferences (first game's tab if any) — used by the EMUDOS_AUTOPREFS smoke hook.</summary>
+    public void OpenPreferencesForSmoke() => OpenPreferences(Vm?.Games.Count > 0 ? Vm.Games[0] : null);
 
     /// <summary>
     /// Boot a game in the EmulatorWindow. Phase 3: downloads the core on first launch, resolves the

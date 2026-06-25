@@ -171,4 +171,57 @@
     </Style>
   </ControlTheme>
 
+  <!-- TabItem: dark; the selected tab gets the accent underline. The reference inherits WPF's 12px
+       default font (Avalonia's Fluent default is 24px), so set FontSize explicitly to match 1:1. -->
+  <ControlTheme x:Key="{x:Type TabItem}" TargetType="TabItem">
+    <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="b" Background="Transparent" BorderThickness="0,0,0,2"
+                BorderBrush="Transparent" Padding="14,8">
+          <ContentPresenter Name="PART_ContentPresenter" Content="{TemplateBinding Header}"
+                            ContentTemplate="{TemplateBinding HeaderTemplate}"
+                            HorizontalAlignment="Center"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover">
+      <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    </Style>
+    <Style Selector="^:selected">
+      <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    </Style>
+    <Style Selector="^:selected /template/ Border#b">
+      <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
+    </Style>
+  </ControlTheme>
+
+  <!-- TabControl: dark strip (BgSecondary) above, dark content (BgPrimary) below, no white border. -->
+  <ControlTheme x:Key="{x:Type TabControl}" TargetType="TabControl">
+    <Setter Property="Background" Value="{StaticResource BgPrimary}"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Grid RowDefinitions="Auto,*">
+          <Border Grid.Row="0" Background="{StaticResource BgSecondary}">
+            <ItemsPresenter Name="PART_ItemsPresenter" Margin="6,0,0,0">
+              <ItemsPresenter.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+              </ItemsPresenter.ItemsPanel>
+            </ItemsPresenter>
+          </Border>
+          <Border Grid.Row="1" Background="{StaticResource BgPrimary}">
+            <ContentPresenter Name="PART_SelectedContentHost"
+                              Content="{TemplateBinding SelectedContent}"
+                              ContentTemplate="{TemplateBinding SelectedContentTemplate}"/>
+          </Border>
+        </Grid>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
 </ResourceDictionary>
