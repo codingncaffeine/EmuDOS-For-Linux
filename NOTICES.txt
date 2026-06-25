@@ -34,6 +34,9 @@ The emulation core is downloaded on demand at runtime (not bundled).
   Licensed under the GNU General Public License v2 or later.
   https://github.com/schellingb/dosbox-pure
 
-SDL3, Avalonia, LibVLCSharp and the .NET runtime are redistributed under their
-respective licenses (Zlib, MIT, LGPL-2.1, and MIT) as part of the self-contained
-publish bundle.
+SDL3, Avalonia, LibVLCSharp and the .NET runtime
+------------------------------------------------
+SDL3 (gamepads + audio, Zlib) is the distro's libsdl3-0 package (a .deb/AUR
+dependency). Avalonia (MIT) and LibVLCSharp (LGPL-2.1) plus the .NET runtime
+(MIT) are redistributed as part of the self-contained publish bundle.
+  https://github.com/libsdl-org/SDL

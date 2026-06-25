@@ -62,6 +62,10 @@ internal static class Sdl3Library
             yield return Path.Combine(coresDir, "SDL3.dll");   // Windows bundled
             yield return Path.Combine(coresDir, "libSDL3.so"); // Linux bundled (rare)
         }
+        // A libSDL3.so.0 dropped next to the binary wins over the system copy (lets a user pin a
+        // specific SDL3 build locally). The .deb/AUR package depends on the distro's libsdl3-0.
+        yield return Path.Combine(AppContext.BaseDirectory, "libSDL3.so.0");
+        yield return Path.Combine(AppContext.BaseDirectory, "libSDL3.so");
         yield return "libSDL3.so.0"; // Linux system package (versioned soname)
         yield return "libSDL3.so";
         yield return "SDL3";         // generic / NativeLibrary platform resolution
