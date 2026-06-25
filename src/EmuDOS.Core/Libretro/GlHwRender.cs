@@ -319,7 +319,11 @@ internal sealed class GlHwRender : IDisposable
                 eglMakeCurrent(_dpy, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
                 if (_surface != IntPtr.Zero) eglDestroySurface(_dpy, _surface);
                 if (_ctx != IntPtr.Zero) eglDestroyContext(_dpy, _ctx);
-                eglTerminate(_dpy);
+                // Do NOT eglTerminate: _dpy is the process-wide EGL_DEFAULT_DISPLAY shared by every
+                // game session, so terminating it here breaks the NEXT launch's hardware context
+                // (the "close and re-open" / eglMakeCurrent-failed flapping). Destroying our own
+                // context + surface is the correct per-session teardown; the display stays initialised
+                // (eglInitialize is idempotent/refcounted, so the next session reuses it cleanly).
             }
         }
         catch (Exception ex) { Log("teardown: " + ex.Message); }
