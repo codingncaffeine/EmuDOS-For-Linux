@@ -521,6 +521,26 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         var p = e.GetPosition(this);
+
+        // Locked + X11 available: feed motion relative to the window centre, then warp the cursor
+        // back there so it never reaches a screen edge — giving the game unbounded relative motion.
+        if (_mouseLocked && Platform.X11Pointer.Available)
+        {
+            var center = new Point(Bounds.Width / 2, Bounds.Height / 2);
+            double dx = p.X - center.X, dy = p.Y - center.Y;
+            if (dx != 0 || dy != 0)
+            {
+                lock (_inputLock)
+                {
+                    _mouseAccumX += dx * _sensitivity;
+                    _mouseAccumY += dy * _sensitivity;
+                }
+                var screenCenter = this.PointToScreen(center);
+                Platform.X11Pointer.WarpTo(screenCenter.X, screenCenter.Y);
+            }
+            return;
+        }
+
         if (_lastPointer is { } last)
         {
             lock (_inputLock)
@@ -570,10 +590,16 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
     private void ToggleMouseLock()
     {
         _mouseLocked = !_mouseLocked;
-        // Avalonia/X11 has no cursor-warp equivalent of the Windows raw-input path, so locked mode
-        // hides the cursor and keeps feeding relative deltas (infinite-turn warp is a known Linux gap,
-        // tracked in notes/PHASE4-BACKLOG.md section B).
+        // Hide the cursor while locked. On X11 (incl. Xwayland) we also warp the pointer to the window
+        // centre on each move (see OnPointerMoved) so the game gets unbounded relative motion — no more
+        // clamping at the screen edge. Pure-Wayland with no Xwayland falls back to bounded deltas.
         Cursor = new Cursor(_mouseLocked ? StandardCursorType.None : StandardCursorType.Arrow);
+        if (_mouseLocked && Platform.X11Pointer.Available)
+        {
+            var center = new Point(Bounds.Width / 2, Bounds.Height / 2);
+            Platform.X11Pointer.WarpTo(this.PointToScreen(center).X, this.PointToScreen(center).Y);
+        }
+        _lastPointer = null; // forget the pre-lock position so the next move isn't a giant jump
         ShowHint(_mouseLocked ? "Mouse locked — middle-click to release" : "Mouse unlocked");
     }
 
