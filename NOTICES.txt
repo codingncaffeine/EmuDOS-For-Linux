@@ -1,0 +1,35 @@
+EmuDOS for Linux — third-party notices
+======================================
+
+EmuDOS itself is licensed under the GNU General Public License v3 (see LICENSE).
+It bundles or links the following third-party components, with their own terms:
+
+munt / mt32emu
+--------------
+The Roland MT-32 synthesis shim (libemudos_mt32.so) is compiled from the
+header-only munt mt32emu library.
+  Copyright (C) 2003-2009 Dean Beeler, Jerome Fisher
+  Copyright (C) 2011-2022 Dean Beeler, Jerome Fisher, Sergey V. Mikayev
+  Licensed under the GNU Lesser General Public License, version 2.1 or later.
+  https://github.com/munt/munt
+The shim is a separate shared library linked at runtime; its source (the
+mt32emu header plus src/native/mt32/emudos_mt32.cpp) ships in the EmuDOS source
+repository, satisfying the LGPL's relinking provision.
+
+librashader
+-----------
+CRT / post-processing shaders are rendered through librashader, loaded at
+runtime when present on the system (not bundled).
+  Copyright (c) the librashader authors.
+  Licensed under the Mozilla Public License 2.0.
+  https://github.com/SnowflakePowered/librashader
+
+DOSBox Pure (libretro core)
+---------------------------
+The emulation core is downloaded on demand at runtime (not bundled).
+  Licensed under the GNU General Public License v2 or later.
+  https://github.com/schellingb/dosbox-pure
+
+SDL3, Avalonia, LibVLCSharp and the .NET runtime are redistributed under their
+respective licenses (Zlib, MIT, LGPL-2.1, and MIT) as part of the self-contained
+publish bundle.
