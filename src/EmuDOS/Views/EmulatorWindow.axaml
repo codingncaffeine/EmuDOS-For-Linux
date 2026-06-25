@@ -1,0 +1,14 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="EmuDOS.Views.EmulatorWindow"
+        Title="EmuDOS" Width="800" Height="640"
+        Icon="/Assets/emudos-linux.png"
+        Background="Black" WindowStartupLocation="CenterScreen">
+  <Grid>
+    <Image Name="Screen" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="None"/>
+    <TextBlock Name="FpsOverlay" IsVisible="True" IsHitTestVisible="False"
+               HorizontalAlignment="Left" VerticalAlignment="Top" Margin="14"
+               Foreground="#7CFC7C" FontFamily="monospace" FontSize="14" FontWeight="Bold"
+               Background="#A0000000" Padding="8,3" Text="FPS …"/>
+  </Grid>
+</Window>

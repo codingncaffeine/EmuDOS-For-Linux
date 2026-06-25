@@ -4,8 +4,9 @@
         xmlns:controls="clr-namespace:EmuDOS.Controls"
         x:Class="EmuDOS.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Title="EmuDOS" Height="840" Width="1458"
-        MinWidth="1458" MaxWidth="1458"
+        Title="EmuDOS" Height="840" Width="1425"
+        MinWidth="1425" MaxWidth="1425"
+        CanResize="True"
         Icon="/Assets/emudos-linux.png"
         Background="{StaticResource BgPrimary}"
         WindowStartupLocation="CenterScreen"
@@ -25,10 +26,12 @@
       <Border Name="ShelfBg" Width="1425" HorizontalAlignment="Center" VerticalAlignment="Top"
               MinHeight="{Binding #Scroller.Bounds.Height}">
         <Border.Background>
-          <!-- bookshelf2.png is natively 1425×671, so Stretch=None + TileMode=Tile repeats it on the
-               exact calibration grid the ShelfPanel lays boxes onto. -->
-          <ImageBrush Source="/Assets/bookshelf2.png" TileMode="Tile" Stretch="None"
-                      AlignmentX="Left" AlignmentY="Top"/>
+          <!-- The bookcase repeats vertically on the exact 1425×671 calibration grid the ShelfPanel
+               lays boxes onto. In Avalonia, TileMode=Tile repeats the DestinationRect, so it MUST be
+               the absolute tile size (the WPF original used Viewport=0,0,1425,671 ViewportUnits=Absolute);
+               without it the brush draws a single image instead of repeating. -->
+          <ImageBrush Source="/Assets/bookshelf2.png" TileMode="Tile" Stretch="Fill"
+                      DestinationRect="0,0,1425,671" AlignmentX="Left" AlignmentY="Top"/>
         </Border.Background>
         <Border.ContextMenu>
           <!-- Library-wide actions (right-click empty shelf space). -->

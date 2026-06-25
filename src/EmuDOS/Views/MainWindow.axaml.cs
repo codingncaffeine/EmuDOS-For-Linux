@@ -12,6 +12,8 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using EmuDOS.Controls;
+using EmuDOS.Core.Downloads;
+using EmuDOS.Core.Engine.DosBoxPure;
 using EmuDOS.Core.Library;
 using EmuDOS.Core.Model;
 using EmuDOS.Services;
@@ -189,7 +191,7 @@ public partial class MainWindow : Window
 
         var menu = new ContextMenu();
 
-        menu.Items.Add(Item("▶  Play", () => ComingSoon("Launching games")));
+        menu.Items.Add(Item("▶  Play", () => _ = LaunchGameAsync(tile)));
 
         var favorite = Item(tile.IsFavorite ? "♥  Favorited" : "♡  Favorite", () =>
         {
@@ -206,7 +208,7 @@ public partial class MainWindow : Window
             try { Process.Start(new ProcessStartInfo(tile.Game.GameboxPath) { UseShellExecute = true }); }
             catch { /* folder may have been removed */ }
         }));
-        menu.Items.Add(Item("🖥  Open in DOS", () => ComingSoon("Launching games")));
+        menu.Items.Add(Item("🖥  Open in DOS", () => _ = LaunchGameAsync(tile, bootToDos: true)));
 
         menu.Items.Add(new Separator());
         menu.Items.Add(Item("🖼  Download box art", () => _ = Vm?.DownloadArtAsync(tile)));
@@ -313,6 +315,70 @@ public partial class MainWindow : Window
 
     /// <summary>Re-attempt covers for games still missing one (after an art login/key change).</summary>
     public Task RefetchMissingArtAsync() => Vm?.FetchMissingArtAsync() ?? Task.CompletedTask;
+
+    /// <summary>Launch the first game on the shelf — used by the EMUDOS_AUTOPLAY smoke hook.</summary>
+    public async Task PlayFirstAsync()
+    {
+        if (Vm?.Games.Count > 0)
+            await LaunchGameAsync(Vm.Games[0]);
+    }
+
+    /// <summary>
+    /// Boot a game in the EmulatorWindow. Phase 3: downloads the core on first launch, resolves the
+    /// gamebox, ensures a bundled CD mounts as D:, and runs on the software path. The smart
+    /// executable picker, graduate-installed-game, and 3dfx hardware path are Phase 4 (backlog C/D);
+    /// for now the gamebox's imported launch profile is used.
+    /// </summary>
+    private async Task LaunchGameAsync(GameTile tile, bool bootToDos = false)
+    {
+        if (Vm is null)
+            return;
+        var services = Services;
+        try
+        {
+
+        // The core is downloaded on demand (never bundled), so fetch it on first launch.
+        if (!services.Downloads.IsInstalled(AssetManifest.DosBoxPure))
+        {
+            Vm.Report("Downloading DOSBox Pure core…", busy: true);
+            var dl = await services.Downloads.DownloadAsync(AssetManifest.DosBoxPure);
+            if (!dl.Success)
+            {
+                Vm.Report($"Core download failed: {dl.Error}", busy: false);
+                return;
+            }
+        }
+
+        var instance = services.Store.Resolve(tile.Game.GameboxPath);
+
+        // Ensure a folder game's bundled CD mounts as D: (covers games whose mount wasn't set up yet).
+        var withDisc = Core.Import.ImportPipeline.EnsureBundledDiscMounted(instance.Profile, instance.ContentPath);
+        if (!ReferenceEquals(withDisc, instance.Profile))
+        {
+            services.Store.WriteProfile(tile.Game.GameboxPath, withDisc);
+            instance = instance with { Profile = withDisc };
+        }
+
+        if (bootToDos)
+            instance = instance with { Profile = instance.Profile with { Launch = new LaunchSpec() } };
+
+        // Folder games write in-game saves into content/; snapshot a baseline before play so the
+        // Manage window and cloud sync can tell saves from the original game files.
+        if (instance.Profile.SourceMedia != SourceMediaType.Iso)
+            ContentBaseline.CaptureIfMissing(instance.ContentPath, instance.SavePath);
+
+        var engine = new DosBoxPureEngine(
+            services.Downloads.InstalledPath(AssetManifest.DosBoxPure), services.Paths.SystemDir, hardware3dfx: false);
+        services.Library.RecordPlay(tile.Id);
+        new EmulatorWindow(engine, instance, tile.Id).Show();
+        Vm.ClearStatus();
+        }
+        catch (Exception ex)
+        {
+            services.SystemLog.Info($"Launch failed: {ex}");
+            Vm.Report($"Couldn't launch: {ex.Message}", busy: false);
+        }
+    }
 }
 
 /// <summary>Minimal ICommand wrapper so menu items can run a plain Action. (CommunityToolkit's
