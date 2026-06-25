@@ -20,6 +20,10 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
+    <!-- App-owned shelf art lives at the repo root (shared with the website); link it into the
+         Avalonia resource namespace so the shelf background and 3D/2D defaults resolve at /Assets/…. -->
+    <AvaloniaResource Include="..\..\Assets\bookshelf.png" Link="Assets\bookshelf.png" />
+    <AvaloniaResource Include="..\..\Assets\bookshelf2.png" Link="Assets\bookshelf2.png" />
   </ItemGroup>
 
   <ItemGroup>

@@ -5,4 +5,15 @@
   <Application.Styles>
     <FluentTheme />
   </Application.Styles>
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="/Themes/Theme.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+      <!-- Drive Fluent's accent (selection, focus, ComboBox highlight) with the EmuDOS red. -->
+      <Color x:Key="SystemAccentColor">#E03535</Color>
+      <Color x:Key="SystemAccentColorDark1">#E03535</Color>
+      <Color x:Key="SystemAccentColorLight1">#E03535</Color>
+    </ResourceDictionary>
+  </Application.Resources>
 </Application>
