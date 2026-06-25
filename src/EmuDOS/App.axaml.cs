@@ -56,6 +56,16 @@ public partial class App : Application
             lcd.Show();
             lcd.SetText("EMUDOS  MT-32");
         }
+        if (Environment.GetEnvironmentVariable("EMUDOS_SHADERTEST") == "1")
+        {
+            var gl = Effects.Egl.GlDevice.TryCreate();
+            Console.WriteLine($"SHADERTEST: GlDevice={(gl is null ? "null" : "OK (EGL+GL context up)")}");
+            gl?.Dispose();
+            var r = new Effects.Librashader.ShaderRenderer();
+            bool ok = r.Initialize(Services.Paths.LibrashaderDllPath, "/nonexistent.slangp");
+            Console.WriteLine($"SHADERTEST: ShaderRenderer.Initialize={ok}, LastError={r.LastError}");
+            r.Dispose();
+        }
 
         // Check GitHub for a newer release and surface it in the bottom bar (best-effort, non-blocking).
         _ = viewModel.CheckForUpdatesAsync();

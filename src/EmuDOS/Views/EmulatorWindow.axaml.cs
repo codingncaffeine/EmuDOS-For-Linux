@@ -207,13 +207,26 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
             CopyRgb565(frame, w, h);
         ApplyLut(w * h);
 
+        // Slang shader (librashader): GPU pass on this thread. The final frame (shaded or native) is
+        // copied into _frameBuffer with its dims under one lock, so the display/record/screenshot paths
+        // always see a consistent buffer+size (no native↔shaded flicker, no recording size race).
+        SyncShaderPreset();
+        byte[] final = _nativeBuffer;
+        int fw = w, fh = h;
+        if (_shaderRenderer is { IsReady: true })
+        {
+            var shaded = _shaderRenderer.Process(_nativeBuffer, w, h, w * 4, isBgr32: true, out int sw, out int sh);
+            if (shaded != null && sw > 0 && sh > 0) { final = shaded; fw = sw; fh = sh; }
+        }
+
         lock (_frameLock)
         {
-            if (_frameBuffer.Length < needed)
-                _frameBuffer = new byte[needed];
-            Buffer.BlockCopy(_nativeBuffer, 0, _frameBuffer, 0, needed);
-            _frameWidth = w;
-            _frameHeight = h;
+            int need = fw * fh * 4;
+            if (_frameBuffer.Length < need)
+                _frameBuffer = new byte[need];
+            Buffer.BlockCopy(final, 0, _frameBuffer, 0, need);
+            _frameWidth = fw;
+            _frameHeight = fh;
         }
 
         if (Interlocked.CompareExchange(ref _renderQueued, 1, 0) == 0)
@@ -840,7 +853,62 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
 
     // CRT shader cycling — the librashader OpenGL renderer lands with the shader phase (backlog C);
     // the per-game preset is already read/persisted so it lights up once the renderer is wired.
-    private void CycleShader() => ShowHint("CRT shaders — coming soon");
+    // The librashader GL renderer is owned by the emu thread; _desiredPreset is set on the UI thread
+    // (CycleShader) and picked up on the next frame by SyncShaderPreset.
+    private Effects.Librashader.ShaderRenderer? _shaderRenderer;
+    private string _activePreset = "";
+    private List<string>? _presetCycle;
+
+    // Apply the per-game preset change (emu thread): (re)build the librashader GL chain. "" = off.
+    private void SyncShaderPreset()
+    {
+        if (_desiredPreset == _activePreset)
+            return;
+        _activePreset = _desiredPreset;
+        _shaderRenderer?.Dispose();
+        _shaderRenderer = null;
+        if (string.IsNullOrEmpty(_desiredPreset))
+            return;
+
+        var paths = ((App)Application.Current!).Services.Paths;
+        var presetPath = Effects.Librashader.ShaderCatalog.Resolve(paths.SlangShaderRoot, _desiredPreset);
+        if (presetPath is null)
+            return;
+        var r = new Effects.Librashader.ShaderRenderer();
+        if (r.Initialize(paths.LibrashaderDllPath, presetPath))
+            _shaderRenderer = r;
+        else
+            r.Dispose();
+    }
+
+    // Cycle the CRT shader live: Off -> each downloaded "crt" slang preset. Persisted per game; the
+    // emu thread rebuilds the librashader chain on the next frame (see SyncShaderPreset).
+    private void CycleShader()
+    {
+        var paths = ((App)Application.Current!).Services.Paths;
+        _presetCycle ??= BuildPresetCycle(paths.SlangShaderRoot);
+        if (_presetCycle.Count <= 1)
+        {
+            ShowHint("No CRT shaders — download them in Preferences → Downloads", 2.2);
+            return;
+        }
+        int idx = _presetCycle.FindIndex(p => string.Equals(p, _desiredPreset, StringComparison.OrdinalIgnoreCase));
+        _desiredPreset = _presetCycle[(idx + 1) % _presetCycle.Count];
+        var name = _desiredPreset.Length == 0 ? "Off" : Path.GetFileNameWithoutExtension(_desiredPreset);
+        ShowHint($"Shader: {name}", 1.4);
+        var store = ((App)Application.Current!).Services.Store;
+        store.WriteState(_instance.GameboxPath, store.ReadState(_instance.GameboxPath) with { Shader = _desiredPreset });
+    }
+
+    // Off + the "crt" category of the downloaded slang pack (empty list when nothing's installed).
+    private static List<string> BuildPresetCycle(string slangRoot)
+    {
+        var list = new List<string> { "" }; // Off
+        foreach (var p in Effects.Librashader.ShaderCatalog.GetDownloaded(slangRoot))
+            if (p.Category.Equals("crt", StringComparison.OrdinalIgnoreCase))
+                list.Add(p.RelativePath);
+        return list;
+    }
 
     // The cheat engine UI — scans/edits/freezes the live game's memory over this session.
     private CheatWindow? _cheatWindow;
@@ -887,6 +955,8 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
         }
         try { _session.Stop(); } catch { }
         try { _session.Dispose(); } catch { }
+        try { _shaderRenderer?.Dispose(); } catch { } // emu thread has stopped — safe to release the GL chain
+        _shaderRenderer = null;
         _audio?.Dispose();
 
         var services = ((App)Application.Current!).Services;
