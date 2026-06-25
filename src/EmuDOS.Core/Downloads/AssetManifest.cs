@@ -41,37 +41,26 @@ public static class AssetManifest
     // LGPL-based DLL, so unlike the GPL core there's no reason to download it. The only
     // user-supplied MT-32 piece is the Roland ROMs (copyrighted; detected, never distributed).
 
-    public const string FfmpegFileName = "ffmpeg.exe";
+    // On Linux, FFmpeg and SDL3 are system packages (the .deb/AUR list them as Depends), exactly like
+    // libvlc — so they're NOT downloaded the way the Windows app fetches win64 binaries. The Ffmpeg
+    // asset is kept only so InstalledPath() resolves; recording falls back to the distro's ffmpeg on
+    // PATH when no bundled copy exists (see EmulatorWindow.ResolveFfmpeg). Neither is in All, so the
+    // Downloads tab doesn't offer them.
+    public const string FfmpegFileName = "ffmpeg";
 
-    /// <summary>FFmpeg (GPL) for video recording — optional. Downloaded, not bundled, like the core.
-    /// BtbN's win64 GPL zip carries ffmpeg.exe under bin/; ZippedCore extracts it by name.</summary>
+    /// <summary>FFmpeg (GPL) for video recording — a system package on Linux (the record path resolves
+    /// it from PATH). Kept as an asset only for InstalledPath() compatibility; not offered as a download.</summary>
     public static DownloadAsset Ffmpeg { get; } = new()
     {
         Id = "ffmpeg",
         DisplayName = "FFmpeg (video recording)",
-        Description = "Enables recording gameplay video. Optional — only needed for the record feature.",
-        Url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
-        Kind = DownloadKind.ZippedCore,
+        Description = "Enables recording gameplay video. Provided by your distro's ffmpeg package.",
+        Url = string.Empty,
+        Kind = DownloadKind.File,
         FileName = FfmpegFileName,
         Category = AssetCategory.Native,
     };
 
-    public const string Sdl3FileName = "SDL3.dll";
-
-    /// <summary>SDL3 — used only to identify controllers by friendly name (Xbox, DualSense, 8BitDo…).
-    /// Optional: controllers work via XInput without it; this just adds recognition. The win32-x64
-    /// release zip carries SDL3.dll at its root; ZippedCore extracts it by name into Cores.</summary>
-    public static DownloadAsset Sdl3 { get; } = new()
-    {
-        Id = "sdl3",
-        DisplayName = "Controller names (SDL3)",
-        Description = "Identifies game controllers by name. Optional — controllers work without it; this just shows which pad is connected.",
-        Url = "https://github.com/libsdl-org/SDL/releases/download/release-3.4.10/SDL3-3.4.10-win32-x64.zip",
-        Kind = DownloadKind.ZippedCore,
-        FileName = Sdl3FileName,
-        Category = AssetCategory.Native,
-    };
-
-    /// <summary>All assets the Downloads tab can offer.</summary>
-    public static IReadOnlyList<DownloadAsset> All { get; } = [DosBoxPure, Catalog, Ffmpeg, Sdl3];
+    /// <summary>All assets the Downloads tab can offer. FFmpeg and SDL3 are system packages on Linux.</summary>
+    public static IReadOnlyList<DownloadAsset> All { get; } = [DosBoxPure, Catalog];
 }
