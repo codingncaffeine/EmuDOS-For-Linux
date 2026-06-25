@@ -51,6 +51,9 @@ public sealed class DosBoxPureSession : IDosSession
         _corePath = corePath;
         _systemDir = systemDir;
         _hardware3dfx = hardware3dfx;
+        // XInput on Windows, SDL3 on Linux. coresDir = the core's folder (Windows may bundle SDL3 there;
+        // Linux loads the system libSDL3.so regardless).
+        _gamepad = Input.GamepadInput.Create(Path.GetDirectoryName(corePath));
     }
 
     public GameInstance Instance => _instance;
@@ -416,7 +419,7 @@ public sealed class DosBoxPureSession : IDosSession
             }
     }
 
-    private readonly Input.XInputController _gamepad = new();
+    private readonly Input.IGamepadInput _gamepad;
     private readonly Audio.MidiMonitor _midi = new();
     private Audio.Mt32Synth? _synth;
     private short[] _mt32Buf = [];

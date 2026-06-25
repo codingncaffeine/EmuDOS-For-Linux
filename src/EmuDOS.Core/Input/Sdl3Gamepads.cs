@@ -4,19 +4,17 @@ namespace EmuDOS.Core.Input;
 
 /// <summary>
 /// Identifies connected game controllers by friendly name via SDL3 (Xbox, DualSense, 8BitDo, …).
-/// Input itself is read through <see cref="XInputController"/>; this is purely for recognition/display.
-/// SDL3.dll is optional (downloaded from the Downloads tab into the Cores folder) — if it isn't present,
-/// <see cref="Available"/> is false and the app just shows generic controller status.
+/// Input itself is read through <see cref="Sdl3Controller"/> / <see cref="XInputController"/>; this is
+/// purely for recognition/display. SDL3 is optional (a system package on Linux, a bundled SDL3.dll on
+/// Windows) — if it isn't present, <see cref="Available"/> is false and the app just shows generic
+/// controller status.
 /// </summary>
 public sealed class Sdl3Gamepads
 {
-    private const uint InitGamepad = 0x00002000; // SDL_INIT_GAMEPAD
-
-    private delegate byte InitDelegate(uint flags);          // SDL_Init → bool
     private delegate IntPtr GetGamepadsDelegate(out int count); // SDL_GetGamepads → SDL_JoystickID* (free it)
-    private delegate IntPtr GetNameForIdDelegate(uint id);   // SDL_GetGamepadNameForID → const char* (UTF-8)
-    private delegate void FreeDelegate(IntPtr mem);          // SDL_free
-    private delegate void UpdateDelegate();                  // SDL_UpdateGamepads (refresh hot-plug list)
+    private delegate IntPtr GetNameForIdDelegate(uint id);      // SDL_GetGamepadNameForID → const char* (UTF-8)
+    private delegate void FreeDelegate(IntPtr mem);             // SDL_free
+    private delegate void UpdateDelegate();                     // SDL_UpdateGamepads (refresh hot-plug list)
 
     private readonly GetGamepadsDelegate? _getGamepads;
     private readonly GetNameForIdDelegate? _getName;
@@ -26,25 +24,16 @@ public sealed class Sdl3Gamepads
 
     public Sdl3Gamepads(string coresDir)
     {
-        try
-        {
-            var path = Path.Combine(coresDir, "SDL3.dll");
-            if (!File.Exists(path) || !NativeLibrary.TryLoad(path, out var lib))
-                return;
+        var lib = Sdl3Library.Handle(coresDir);
+        if (lib == IntPtr.Zero)
+            return;
 
-            var init = Bind<InitDelegate>(lib, "SDL_Init");
-            _getGamepads = Bind<GetGamepadsDelegate>(lib, "SDL_GetGamepads");
-            _getName = Bind<GetNameForIdDelegate>(lib, "SDL_GetGamepadNameForID");
-            _free = Bind<FreeDelegate>(lib, "SDL_free");
-            _update = Bind<UpdateDelegate>(lib, "SDL_UpdateGamepads");
+        _getGamepads = Sdl3Library.Bind<GetGamepadsDelegate>(lib, "SDL_GetGamepads");
+        _getName = Sdl3Library.Bind<GetNameForIdDelegate>(lib, "SDL_GetGamepadNameForID");
+        _free = Sdl3Library.Bind<FreeDelegate>(lib, "SDL_free");
+        _update = Sdl3Library.Bind<UpdateDelegate>(lib, "SDL_UpdateGamepads");
 
-            if (init is not null && _getGamepads is not null && _getName is not null && _free is not null)
-                _ready = init(InitGamepad) != 0;
-        }
-        catch
-        {
-            _ready = false;
-        }
+        _ready = _getGamepads is not null && _getName is not null && _free is not null;
     }
 
     /// <summary>True when SDL3 loaded and initialized (i.e. recognition is available).</summary>
@@ -77,7 +66,4 @@ public sealed class Sdl3Gamepads
         }
         return names;
     }
-
-    private static T? Bind<T>(IntPtr lib, string name) where T : Delegate =>
-        NativeLibrary.TryGetExport(lib, name, out var p) ? Marshal.GetDelegateForFunctionPointer<T>(p) : null;
 }
