@@ -1,0 +1,135 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="EmuDOS.Views.GameDetailWindow"
+        Title="EmuDOS" WindowDecorations="None" TransparencyLevelHint="Transparent"
+        Background="Transparent" CanResize="False" ShowInTaskbar="False" Topmost="True"
+        Width="540" Height="720" WindowStartupLocation="CenterOwner" KeyDown="OnKeyDown">
+
+  <!-- A floating card over the shelf — no dimming overlay; stays on top of the app. -->
+  <Border Name="ModalCard" Width="460" VerticalAlignment="Center" HorizontalAlignment="Center"
+          Background="{StaticResource BgSecondary}" BorderBrush="{StaticResource BorderNormal}"
+          BorderThickness="1" CornerRadius="14" BoxShadow="0 0 40 0 #BF000000">
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="345"/>   <!-- art/video banner: 460×345 = 4:3 -->
+        <RowDefinition Height="*"/>      <!-- info (scrolls) -->
+        <RowDefinition Height="Auto"/>   <!-- actions (pinned) -->
+      </Grid.RowDefinitions>
+
+      <!-- Art / video banner -->
+      <Border Grid.Row="0" CornerRadius="14,14,0,0" ClipToBounds="True">
+        <Grid>
+          <Border Background="{StaticResource BgTertiary}"/>
+          <!-- Video snap (LibVLC → WriteableBitmap), revealed once the first frame arrives. -->
+          <Image Name="VideoImage" Stretch="UniformToFill" IsVisible="False"/>
+          <!-- Cover art / screengrab placeholder; on top until the video is ready. -->
+          <Image Name="HeaderImage" Stretch="UniformToFill"
+                 RenderOptions.BitmapInterpolationMode="HighQuality" IsVisible="False">
+            <Image.Transitions>
+              <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.4"/>
+              </Transitions>
+            </Image.Transitions>
+          </Image>
+          <!-- Legibility gradient. -->
+          <Border>
+            <Border.Background>
+              <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                <GradientStop Color="#33FFFFFF" Offset="0"/>
+                <GradientStop Color="#00000000" Offset="0.45"/>
+                <GradientStop Color="#99000000" Offset="1"/>
+              </LinearGradientBrush>
+            </Border.Background>
+          </Border>
+          <!-- Title placeholder (shown when there's no art). -->
+          <TextBlock Name="ArtPlaceholderText" FontSize="22" FontWeight="Bold"
+                     Foreground="#AAFFFFFF" TextWrapping="Wrap" TextAlignment="Center"
+                     HorizontalAlignment="Center" VerticalAlignment="Center" Margin="32"/>
+          <!-- Close -->
+          <Border Background="#66000000" CornerRadius="12" Width="26" Height="26"
+                  HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,12,0"
+                  Cursor="Hand" PointerPressed="OnClose">
+            <TextBlock Text="✕" FontSize="12" Foreground="White"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <!-- Favorite heart badge -->
+          <Border Name="FavoriteBadge" Background="#55000000" CornerRadius="12" Width="26" Height="26"
+                  HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,44,0"
+                  IsVisible="False">
+            <TextBlock Text="♥" FontSize="12" Foreground="{StaticResource Accent}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <!-- Machine tag -->
+          <Border Background="#88000000" CornerRadius="6" Padding="10,4"
+                  HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="16,0,0,16">
+            <TextBlock Name="MachineTag" FontSize="11" FontWeight="SemiBold" Foreground="White"/>
+          </Border>
+        </Grid>
+      </Border>
+
+      <!-- Info -->
+      <ScrollViewer Grid.Row="1" Margin="24,18,24,0" VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled">
+        <StackPanel>
+          <TextBlock Name="GameTitle" FontSize="20" FontWeight="Bold"
+                     Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap"/>
+
+          <!-- Meta pills (left) + activity pills (right) -->
+          <Grid Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <WrapPanel Grid.Column="0">
+              <Border Name="YearPill" Background="{StaticResource BgTertiary}" CornerRadius="4"
+                      Padding="8,3" Margin="0,0,6,6" IsVisible="False">
+                <TextBlock Name="GameYear" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+              </Border>
+              <Border Name="DeveloperPill" Background="{StaticResource BgTertiary}" CornerRadius="4"
+                      Padding="8,3" Margin="0,0,6,6" IsVisible="False">
+                <TextBlock Name="GameDeveloper" FontSize="11" Foreground="{StaticResource TextSecondary}"
+                           MaxWidth="180" TextTrimming="CharacterEllipsis"/>
+              </Border>
+              <Border Name="GenrePill" Background="{StaticResource BgTertiary}" CornerRadius="4"
+                      Padding="8,3" Margin="0,0,6,6" IsVisible="False">
+                <TextBlock Name="GameGenre" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+              </Border>
+            </WrapPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+              <Border Name="PlayedPill" Background="{StaticResource BgTertiary}" CornerRadius="4"
+                      Padding="8,3" Margin="6,0,0,6">
+                <TextBlock Name="StatPlayed" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+              </Border>
+              <Border Name="PlayTimePill" Background="{StaticResource BgTertiary}" CornerRadius="4"
+                      Padding="8,3" Margin="6,0,0,6" IsVisible="False">
+                <TextBlock Name="StatPlayTime" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+              </Border>
+            </StackPanel>
+          </Grid>
+
+          <ScrollViewer Name="GameDescriptionScroll" MaxHeight="96" Margin="0,6,0,0"
+                        VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                        IsVisible="False">
+            <TextBlock Name="GameDescription" FontSize="12" Foreground="{StaticResource TextSecondary}"
+                       TextWrapping="Wrap" LineHeight="18"/>
+          </ScrollViewer>
+        </StackPanel>
+      </ScrollViewer>
+
+      <!-- Actions -->
+      <Grid Grid.Row="2" Margin="24,16,24,22">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <Button Grid.Column="0" Content="▶   Play" Height="42" Margin="0,0,8,0" FontWeight="SemiBold"
+                HorizontalContentAlignment="Center"
+                Foreground="White" Background="{StaticResource Accent}" Click="OnPlay"/>
+        <Button Name="FavoriteButton" Grid.Column="1" Content="♡  Favorite" Height="42" Margin="0,0,8,0"
+                Padding="16,6" Click="OnFavorite"/>
+        <Button Grid.Column="2" Content="⋯" Height="42" Width="42" Click="OnMore"/>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

@@ -9,7 +9,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Controls.Primitives;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using EmuDOS.Controls;
 using EmuDOS.Core.Downloads;
@@ -174,13 +176,113 @@ public partial class MainWindow : Window
         OpenGameCard(tile);
     }
 
-    // Hover video preview (the Trinitron monitor popup) needs the LibVLC SnapPlayer — Phase 4.
-    private void OnBoxPointerEntered(object? sender, PointerEventArgs e) { }
+    // ── Hover video preview (Trinitron monitor popup) ────────────────────────────────────────
+    private SnapPlayer? _hoverPlayer;
+    private DispatcherTimer? _hoverTimer;
+    private GameTile? _hoverTile;
+    private Control? _hoverElement;
+    private readonly HashSet<long> _noSnap = [];
 
-    private void OnBoxPointerExited(object? sender, PointerEventArgs e) { }
+    private void OnBoxPointerEntered(object? sender, PointerEventArgs e)
+    {
+        if (Vm is null || Vm.IsEditMode || _openCard is not null)
+            return;
+        if (sender is not Control { DataContext: GameTile tile } element)
+            return;
+        _hoverTile = tile;
+        _hoverElement = element;
+        _hoverTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
+        _hoverTimer.Tick -= OnHoverTick;
+        _hoverTimer.Tick += OnHoverTick;
+        _hoverTimer.Stop();
+        _hoverTimer.Start();
+    }
 
-    /// <summary>The per-game detail card lands with the secondary windows in a later phase.</summary>
-    private void OpenGameCard(GameTile tile) => ComingSoon($"Detail card for “{tile.Title}”");
+    private void OnBoxPointerExited(object? sender, PointerEventArgs e)
+    {
+        if (sender is Control { DataContext: GameTile tile } && tile == _hoverTile)
+        {
+            _hoverTimer?.Stop();
+            _hoverTile = null;
+            HideHoverPreview();
+        }
+    }
+
+    private void OnHoverTick(object? sender, EventArgs e)
+    {
+        _hoverTimer?.Stop();
+        if (_hoverTile is { } tile && _hoverElement is { } element)
+            ShowHoverPreview(tile, element);
+    }
+
+    private async void ShowHoverPreview(GameTile tile, Control element)
+    {
+        if (_noSnap.Contains(tile.Id) || _openCard is not null)
+            return;
+        var services = Services;
+        var snapPath = Path.Combine(services.Paths.SnapsDir, SnapKeyFor(tile) + ".mp4");
+        if (!File.Exists(snapPath))
+        {
+            // Fetch once in the background; the preview shows next hover (don't block or spam SS).
+            try { await services.Art.FetchSnapAsync(tile.Title, snapPath); } catch { }
+            if (!File.Exists(snapPath))
+                _noSnap.Add(tile.Id);
+            return;
+        }
+        if (_hoverTile != tile)
+            return;
+
+        if (_hoverPlayer is null)
+        {
+            _hoverPlayer = new SnapPlayer(Dispatcher.UIThread);
+            _hoverPlayer.FrameDrawn += () => HoverVideo.InvalidateVisual();
+        }
+        HoverVideo.Source = _hoverPlayer.Bitmap;
+        HoverPopup.PlacementTarget = element;
+        HoverPopup.Placement = PlacementMode.Right;
+        _hoverPlayer.Play(snapPath, onFirstFrame: () => { if (_hoverTile == tile) HoverPopup.IsOpen = true; });
+    }
+
+    private void HideHoverPreview()
+    {
+        HoverPopup.IsOpen = false;
+        _hoverPlayer?.Stop();
+    }
+
+    private static string SnapKeyFor(GameTile tile)
+    {
+        var id = string.IsNullOrWhiteSpace(tile.Game.CanonicalId) ? tile.Title : tile.Game.CanonicalId!;
+        return string.Concat(id.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)).Trim();
+    }
+
+    // ── The per-game detail card ─────────────────────────────────────────────────────────────
+    private GameDetailWindow? _openCard;
+
+    /// <summary>Open the per-game detail card (Play launches; ★ favorites; "…" has the rest). The
+    /// overflow actions that need a not-yet-ported window route to a status note until that window
+    /// lands (tracked in notes/PHASE4-BACKLOG.md).</summary>
+    private void OpenGameCard(GameTile tile)
+    {
+        _openCard?.Close();
+        _hoverTimer?.Stop();
+        HideHoverPreview(); // a card takes over — no hover monitor behind it
+        var services = Services;
+
+        var overflow = new List<(string, Action)>
+        {
+            ("Manage…", () => ComingSoon("Manage window")),
+            ("Rename from ScreenScraper…", () => ComingSoon("ScreenScraper rename dialog")),
+            ("Cheats… (preview)", () => ComingSoon("Cheats")),
+            ("Game preferences…", () => ComingSoon("Game preferences")),
+            ("Open in DOS", () => _ = LaunchGameAsync(tile, bootToDos: true)),
+            ("Launch parameters…", () => ComingSoon("Launch parameters")),
+            ("Read manual", () => ComingSoon("Manual viewer")),
+        };
+
+        _openCard = new GameDetailWindow(tile, services, () => _ = LaunchGameAsync(tile), overflow);
+        _openCard.Closed += (s, _) => { if (ReferenceEquals(_openCard, s)) _openCard = null; };
+        _openCard.Show(this);
+    }
 
     // ── Per-game right-click menu ────────────────────────────────────────────────────────────
     private void OnBoxContextRequested(object? sender, ContextRequestedEventArgs e)
@@ -237,7 +339,7 @@ public partial class MainWindow : Window
         menu.Items.Add(Item("📖  Read manual", () => ComingSoon("Manual viewer")));
 
         menu.Items.Add(new Separator());
-        menu.Items.Add(Item("🗑  Delete", () => Vm?.DeleteGames(new[] { tile })));
+        menu.Items.Add(Item("🗑  Delete", () => DeleteGamesConfirmed(new[] { tile })));
 
         menu.Open(element);
     }
@@ -262,14 +364,22 @@ public partial class MainWindow : Window
         catch (Exception ex) { Vm?.Report($"Couldn't set box art: {ex.Message}", busy: false); }
     }
 
-    private void DeleteSelected()
+    private void DeleteSelected() =>
+        DeleteGamesConfirmed(Vm?.Games.Where(g => g.IsSelected).ToList() ?? []);
+
+    /// <summary>Confirm, then delete. Box art is preserved on delete, so re-importing restores covers
+    /// without a re-download.</summary>
+    private async void DeleteGamesConfirmed(IReadOnlyList<GameTile> games)
     {
-        var selected = Vm?.Games.Where(g => g.IsSelected).ToList() ?? [];
-        if (selected.Count == 0)
+        if (games.Count == 0)
             return;
-        // A modal confirm dialog lands with the dialogs in Phase 4; box art is preserved on delete,
-        // so re-importing restores covers without a re-download.
-        Vm!.DeleteGames(selected);
+        var names = games.Count <= 3
+            ? string.Join(", ", games.Select(g => g.Title))
+            : $"{games.Count} games";
+        if (await ConfirmDialog.ShowAsync(this, "Delete from library",
+                $"Remove {names} from your library?\n\nThe box art is kept, so re-importing won't re-download it.",
+                "Delete"))
+            Vm!.DeleteGames(games);
     }
 
     // ── Drag-and-drop import (files onto the window) ─────────────────────────────────────────
@@ -321,6 +431,13 @@ public partial class MainWindow : Window
     {
         if (Vm?.Games.Count > 0)
             await LaunchGameAsync(Vm.Games[0]);
+    }
+
+    /// <summary>Open the detail card for the first game — used by the EMUDOS_AUTOCARD smoke hook.</summary>
+    public void OpenFirstCard()
+    {
+        if (Vm?.Games.Count > 0)
+            OpenGameCard(Vm.Games[0]);
     }
 
     /// <summary>
