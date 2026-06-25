@@ -10,12 +10,13 @@ public class GamepadInputTests
         var pad = GamepadInput.Create();
 
         // Must be safe to poll every frame and query even with no controller attached / no backend.
+        // (Don't assert port 0 is empty — a controller may genuinely be plugged into the test machine.)
         pad.Poll();
         pad.Poll();
 
-        Assert.False(pad.IsButtonDown(0, PadButton.A));
-        Assert.False(pad.IsConnected(0));
-        Assert.False(pad.IsButtonDown(-1, PadButton.Start)); // out-of-range ports are safe
+        _ = pad.IsButtonDown(0, PadButton.A); // returns a bool without throwing, controller or not
+        _ = pad.IsConnected(0);
+        Assert.False(pad.IsButtonDown(-1, PadButton.Start)); // out-of-range ports are always safe/false
         Assert.False(pad.IsButtonDown(99, PadButton.Start));
     }
 
