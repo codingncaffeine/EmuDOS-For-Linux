@@ -28,7 +28,7 @@ source=("$url/releases/download/v$pkgver/EmuDOS-$pkgver-linux-x64.tar.gz"
         "$url/raw/v$pkgver/LICENSE"
         "emudos-linux.png::$url/raw/v$pkgver/src/EmuDOS/Assets/emudos-linux.png"
         "io.github.codingncaffeine.EmuDOS.metainfo.xml::$url/raw/v$pkgver/packaging/io.github.codingncaffeine.EmuDOS.metainfo.xml")
-sha256sums=('SKIP'
+sha256sums=('74ca733b3338d401a7f8264a3c4b691cf0747d28f1cba2d1793e87c134587cc4'
             'SKIP'
             'SKIP'
             'SKIP')
@@ -38,8 +38,12 @@ package() {
                    "$pkgdir/usr/share/applications" \
                    "$pkgdir/usr/share/icons/hicolor/512x512/apps" \
                    "$pkgdir/usr/share/metainfo"
-    cp -a "$srcdir"/{EmuDOS,*.so,Assets,README.txt} "$pkgdir/usr/lib/emudos/" 2>/dev/null || \
-        cp -a "$srcdir"/. "$pkgdir/usr/lib/emudos/"
+    # Install only the release-tarball payload into the app dir — NOT the AUR build's extra downloaded
+    # sources (icon/metainfo/LICENSE), which are placed under /usr/share below.
+    for item in EmuDOS *.so Assets README.txt; do
+        [ -e "$srcdir/$item" ] && cp -a "$srcdir/$item" "$pkgdir/usr/lib/emudos/"
+    done
+    install -Dm644 "$srcdir/NOTICES.txt" "$pkgdir/usr/share/doc/$pkgname/NOTICES.txt"
 
     cat > "$pkgdir/usr/bin/emudos" <<'EOF'
 #!/bin/sh
