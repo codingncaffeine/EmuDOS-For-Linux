@@ -271,12 +271,12 @@ public partial class MainWindow : Window
         var overflow = new List<(string, Action)>
         {
             ("Manage…", () => ComingSoon("Manage window")),
-            ("Rename from ScreenScraper…", () => ComingSoon("ScreenScraper rename dialog")),
+            ("Rename from ScreenScraper…", () => RenameFromScreenScraper(tile)),
             ("Cheats… (preview)", () => ComingSoon("Cheats")),
             ("Game preferences…", () => ComingSoon("Game preferences")),
             ("Open in DOS", () => _ = LaunchGameAsync(tile, bootToDos: true)),
-            ("Launch parameters…", () => ComingSoon("Launch parameters")),
-            ("Read manual", () => ComingSoon("Manual viewer")),
+            ("Launch parameters…", () => EditLaunchParameters(tile)),
+            ("Read manual", () => _ = OpenManualAsync(tile)),
         };
 
         _openCard = new GameDetailWindow(tile, services, () => _ = LaunchGameAsync(tile), overflow);
@@ -335,8 +335,8 @@ public partial class MainWindow : Window
             });
         }
         menu.Items.Add(boxStyle);
-        menu.Items.Add(Item("✏  Rename from ScreenScraper…", () => ComingSoon("ScreenScraper rename dialog")));
-        menu.Items.Add(Item("📖  Read manual", () => ComingSoon("Manual viewer")));
+        menu.Items.Add(Item("✏  Rename from ScreenScraper…", () => RenameFromScreenScraper(tile)));
+        menu.Items.Add(Item("📖  Read manual", () => _ = OpenManualAsync(tile)));
 
         menu.Items.Add(new Separator());
         menu.Items.Add(Item("🗑  Delete", () => DeleteGamesConfirmed(new[] { tile })));
@@ -362,6 +362,86 @@ public partial class MainWindow : Window
             return;
         try { Vm?.SetBoxArt(tile, File.ReadAllBytes(path)); }
         catch (Exception ex) { Vm?.Report($"Couldn't set box art: {ex.Message}", busy: false); }
+    }
+
+    // ── Manual / rename / launch parameters ──────────────────────────────────────────────────
+
+    /// <summary>Open the game's manual. Downloads it on first use; then shell-opens the system PDF
+    /// handler (WebView2 has no Linux equivalent — that's the locked porting decision).</summary>
+    private async Task OpenManualAsync(GameTile tile)
+    {
+        if (Vm is null)
+            return;
+        var services = Services;
+        var manual = FindManual(tile, services);
+        if (manual is null)
+        {
+            Vm.Report($"Downloading manual for {tile.Title}…", busy: true);
+            try
+            {
+                var dir = Path.Combine(services.Paths.ManualsDir, SanitizeName(tile.Title));
+                manual = await services.Manuals.FetchManualAsync(tile.Title, dir);
+            }
+            catch (Exception ex) { Vm.Report($"Manual download failed: {ex.Message}", busy: false); return; }
+            if (manual is null) { Vm.Report($"No manual found for {tile.Title}.", busy: false); return; }
+            Vm.ClearStatus();
+        }
+        try { Process.Start(new ProcessStartInfo(manual) { UseShellExecute = true }); } // xdg-open
+        catch (Exception ex) { Vm.Report($"Couldn't open the manual: {ex.Message}", busy: false); }
+    }
+
+    // An already-downloaded manual, or one bundled with the game (eXoDOS ships PDFs in the content).
+    private static string? FindManual(GameTile tile, AppServices services)
+    {
+        var dir = Path.Combine(services.Paths.ManualsDir, SanitizeName(tile.Title));
+        if (Directory.Exists(dir))
+        {
+            var downloaded = Directory.EnumerateFiles(dir, "manual.*").FirstOrDefault();
+            if (downloaded is not null)
+                return downloaded;
+        }
+        var content = Path.Combine(tile.Game.GameboxPath, "content");
+        return Directory.Exists(content)
+            ? Directory.EnumerateFiles(content, "*.pdf", SearchOption.AllDirectories).FirstOrDefault()
+            : null;
+    }
+
+    private static string SanitizeName(string name)
+    {
+        foreach (var c in Path.GetInvalidFileNameChars())
+            name = name.Replace(c, '_');
+        return name.Trim();
+    }
+
+    private async void RenameFromScreenScraper(GameTile tile)
+    {
+        var value = await TextPromptDialog.ShowAsync(this,
+            $"Rename from ScreenScraper — {tile.Title}",
+            "Type the game's name to look up. It'll be renamed to ScreenScraper's matched title and its " +
+            "art and details refreshed. Use the exact title (e.g. \"King's Quest VI\") for ones the " +
+            "automatic match can't find.",
+            tile.Title);
+        if (string.IsNullOrWhiteSpace(value) || Vm is null)
+            return;
+        await Vm.RenameFromScreenScraperAsync(tile, value.Trim());
+    }
+
+    private async void EditLaunchParameters(GameTile tile)
+    {
+        var services = Services;
+        var profile = services.Store.ReadProfile(tile.Game.GameboxPath);
+        var value = await TextPromptDialog.ShowAsync(this,
+            $"Launch parameters — {tile.Title}",
+            "Command-line arguments passed to the game's program when it starts (e.g. a sound-mode switch some games need). Leave blank for none.",
+            profile.Launch.Arguments);
+        if (value is null)
+            return; // cancelled
+        var args = string.IsNullOrWhiteSpace(value) ? null : value;
+        var updated = profile with { Launch = profile.Launch with { Arguments = args } };
+        services.Store.WriteProfile(tile.Game.GameboxPath, updated);
+        Vm?.Report(
+            args is null ? $"Cleared launch parameters for {tile.Title}." : $"Launch parameters set: {args}",
+            busy: false);
     }
 
     private void DeleteSelected() =>
