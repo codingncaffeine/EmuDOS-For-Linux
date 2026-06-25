@@ -28,20 +28,23 @@ public sealed partial class Mt32Synth : IDisposable
     private static partial void mt32_free(nint handle);
 
     /// <summary>
-    /// Let the shim be loaded from <paramref name="searchDir"/> (where the Downloads tab installs
-    /// it) before falling back to the default search (next to the exe, for dev). Call once at startup.
+    /// Let the shim be loaded from <paramref name="searchDir"/> before falling back to the default
+    /// search (next to the binaries, where packaging ships it). Tries the platform's library name —
+    /// libemudos_mt32.so on Linux, emudos_mt32.dll on Windows, libemudos_mt32.dylib on macOS. Call
+    /// once at startup.
     /// </summary>
     public static void RegisterNativeResolver(string searchDir)
     {
         NativeLibrary.SetDllImportResolver(typeof(Mt32Synth).Assembly, (name, _, _) =>
         {
             if (name == "emudos_mt32")
-            {
-                var candidate = Path.Combine(searchDir, "emudos_mt32.dll");
-                if (File.Exists(candidate) && NativeLibrary.TryLoad(candidate, out var handle))
-                    return handle;
-            }
-            return nint.Zero; // fall back to the default resolver
+                foreach (var file in new[] { "libemudos_mt32.so", "emudos_mt32.dll", "libemudos_mt32.dylib" })
+                {
+                    var candidate = Path.Combine(searchDir, file);
+                    if (File.Exists(candidate) && NativeLibrary.TryLoad(candidate, out var handle))
+                        return handle;
+                }
+            return nint.Zero; // fall back to the default resolver (next to the binaries / system)
         });
     }
 

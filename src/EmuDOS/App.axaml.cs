@@ -50,6 +50,12 @@ public partial class App : Application
             window.OpenPreferencesForSmoke();
         if (Environment.GetEnvironmentVariable("EMUDOS_AUTOCHEAT") == "1")
             new Views.CheatWindow().Show();
+        if (Environment.GetEnvironmentVariable("EMUDOS_AUTOLCD") == "1")
+        {
+            var lcd = new Views.Mt32LcdWindow();
+            lcd.Show();
+            lcd.SetText("EMUDOS  MT-32");
+        }
 
         // Check GitHub for a newer release and surface it in the bottom bar (best-effort, non-blocking).
         _ = viewModel.CheckForUpdatesAsync();

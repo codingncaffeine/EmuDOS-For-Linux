@@ -52,4 +52,19 @@
     <!-- Bundled (via LibVLCSharp) for game-card video snaps. System libvlc on Linux; LGPL-2.1. -->
     <PackageReference Include="LibVLCSharp" Version="3.9.6" />
   </ItemGroup>
+
+  <!-- Build the MT-32 native shim (libemudos_mt32.so) from src/native/mt32 (header-only munt, LGPL)
+       and ship it next to the app binaries, where the default native resolver finds it. Built from
+       source on any Linux machine with g++/bash — no committed binary. -->
+  <Target Name="BuildAndCopyMt32Shim" AfterTargets="Build;Publish"
+          Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+    <Exec Command="bash &quot;$(MSBuildThisFileDirectory)../native/mt32/build.sh&quot;"
+          Condition="!Exists('$(MSBuildThisFileDirectory)../native/mt32/libemudos_mt32.so')" />
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)../native/mt32/libemudos_mt32.so"
+          DestinationFolder="$(OutDir)" SkipUnchangedFiles="true"
+          Condition="'$(OutDir)' != ''" />
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)../native/mt32/libemudos_mt32.so"
+          DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true"
+          Condition="'$(PublishDir)' != ''" />
+  </Target>
 </Project>

@@ -7,6 +7,14 @@
 
 using namespace MT32Emu;
 
+// Export macro: dllexport on Windows (emudos_mt32.dll), default ELF visibility on Linux/macOS
+// (libemudos_mt32.so), so the same source builds the shim for either platform.
+#ifdef _WIN32
+#define EMUDOS_EXPORT __declspec(dllexport)
+#else
+#define EMUDOS_EXPORT __attribute__((visibility("default")))
+#endif
+
 namespace
 {
     // Minimal SHA1 (makeROMImage identifies a ROM by its SHA1 digest).
@@ -122,7 +130,7 @@ namespace
 
 extern "C"
 {
-    __declspec(dllexport) void* mt32_create(
+    EMUDOS_EXPORT void* mt32_create(
         const unsigned char* control, int controlLen, const unsigned char* pcm, int pcmLen)
     {
         BufFile controlFile((const Bit8u*)control, (size_t)controlLen);
@@ -142,27 +150,27 @@ extern "C"
         return synth;
     }
 
-    __declspec(dllexport) int mt32_sample_rate(void* handle)
+    EMUDOS_EXPORT int mt32_sample_rate(void* handle)
     {
         return handle ? (int)((Synth*)handle)->getStereoOutputSampleRate() : 0;
     }
 
-    __declspec(dllexport) void mt32_play_msg(void* handle, unsigned int msg)
+    EMUDOS_EXPORT void mt32_play_msg(void* handle, unsigned int msg)
     {
         if (handle) ((Synth*)handle)->playMsg((Bit32u)msg);
     }
 
-    __declspec(dllexport) void mt32_play_sysex(void* handle, const unsigned char* data, int len)
+    EMUDOS_EXPORT void mt32_play_sysex(void* handle, const unsigned char* data, int len)
     {
         if (handle && len > 0) ((Synth*)handle)->playSysex((const Bit8u*)data, (Bit32u)len);
     }
 
-    __declspec(dllexport) void mt32_render(void* handle, short* out, int frames)
+    EMUDOS_EXPORT void mt32_render(void* handle, short* out, int frames)
     {
         if (handle && frames > 0) ((Synth*)handle)->render((Bit16s*)out, (Bit32u)frames);
     }
 
-    __declspec(dllexport) void mt32_free(void* handle)
+    EMUDOS_EXPORT void mt32_free(void* handle)
     {
         if (handle) { Synth* s = (Synth*)handle; s->close(); delete s; }
     }
