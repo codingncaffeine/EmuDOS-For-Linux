@@ -1,0 +1,51 @@
+# Upstream reference clone (kept locally for porting the spec, not part of this repo)
+reference/
+
+# .NET build artifacts
+[Bb]in/
+[Oo]bj/
+artifacts/
+build-stage/
+*.user
+.vs/
+
+# Rider / VS Code
+.idea/
+*.DotSettings.user
+
+# NuGet
+*.nupkg
+packages/
+
+# Test output / coverage / local scratch
+[Tt]est[Rr]esults/
+*.coverage
+*.cobertura.xml
+[Cc]overage/
+scratch/
+test-games/
+
+# Native build output (built from source via MSBuild targets — never committed)
+*.so
+*.so.*
+*.dll
+src/native/mt32/*.obj
+src/native/mt32/*.exp
+src/native/mt32/*.lib
+
+# App runtime data (cores, ROMs, downloaded shaders — never commit)
+Cores/
+Gameboxes/
+publish/
+
+# Local API keys — never commit (see Secrets.cs.template)
+**/Secrets.cs
+
+# Internal working / planning notes — local only, never published (public repo)
+/notes/
+local-notes/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
