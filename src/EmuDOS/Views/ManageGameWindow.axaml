@@ -1,0 +1,159 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:v="clr-namespace:EmuDOS.Views"
+        x:Class="EmuDOS.Views.ManageGameWindow"
+        Title="Manage" Height="600" Width="740"
+        Icon="/Assets/emudos-linux.png"
+        Background="{StaticResource BgPrimary}" WindowStartupLocation="CenterOwner"
+        CanResize="True" MinHeight="420" MinWidth="520">
+
+  <Window.Resources>
+    <!-- A media/state/file row: optional thumbnail + two text lines + action buttons. -->
+    <DataTemplate x:Key="RowWithOpen" x:DataType="v:ManageRow">
+      <Grid Margin="2,4" ColumnDefinitions="Auto,*,Auto" HorizontalAlignment="Stretch">
+        <Grid.ContextMenu>
+          <ContextMenu><MenuItem Header="Open folder" Click="OnShowInExplorer"/></ContextMenu>
+        </Grid.ContextMenu>
+        <Border Grid.Column="0" Width="96" Height="60" Background="#22000000" Margin="0,0,10,0"
+                CornerRadius="3" IsVisible="{Binding ThumbVisible}">
+          <Image Source="{Binding Thumb}" Stretch="Uniform"/>
+        </Border>
+        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+          <TextBlock Text="{Binding Primary}" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+          <TextBlock Text="{Binding Secondary}" Foreground="{StaticResource TextSecondary}" FontSize="11"/>
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+          <Button Content="Open" Margin="0,0,6,0" Padding="10,3" Click="OnOpenRow"/>
+          <Button Content="Delete" Padding="10,3" Click="OnDeleteRow"/>
+        </StackPanel>
+      </Grid>
+    </DataTemplate>
+
+    <!-- Save-state rows: Load (launch the game restored to this state) + Delete. -->
+    <DataTemplate x:Key="RowState" x:DataType="v:ManageRow">
+      <Grid Margin="2,4" ColumnDefinitions="Auto,*,Auto" HorizontalAlignment="Stretch">
+        <Grid.ContextMenu>
+          <ContextMenu><MenuItem Header="Open folder" Click="OnShowInExplorer"/></ContextMenu>
+        </Grid.ContextMenu>
+        <Border Grid.Column="0" Width="96" Height="60" Background="#22000000" Margin="0,0,10,0"
+                CornerRadius="3" IsVisible="{Binding ThumbVisible}">
+          <Image Source="{Binding Thumb}" Stretch="Uniform"/>
+        </Border>
+        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+          <TextBlock Text="{Binding Primary}" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+          <TextBlock Text="{Binding Secondary}" Foreground="{StaticResource TextSecondary}" FontSize="11"/>
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+          <Button Content="Load" Margin="0,0,6,0" Padding="10,3" Click="OnLoadState"/>
+          <Button Content="Delete" Padding="10,3" Click="OnDeleteRow"/>
+        </StackPanel>
+      </Grid>
+    </DataTemplate>
+
+    <!-- Extras gallery thumbnail (click to open the flipbook viewer). -->
+    <DataTemplate x:Key="ExtraThumb" x:DataType="v:ManageRow">
+      <Button Click="OnOpenExtra" Cursor="Hand" Margin="6" Background="Transparent" BorderThickness="0" Padding="0">
+        <StackPanel Width="156">
+          <Border Background="#22000000" CornerRadius="3" Height="116">
+            <Image Source="{Binding Thumb}" Stretch="Uniform" Margin="5"/>
+          </Border>
+          <TextBlock Text="{Binding Primary}" Foreground="{StaticResource TextSecondary}"
+                     HorizontalAlignment="Center" Margin="0,4,0,0" FontSize="11"/>
+        </StackPanel>
+      </Button>
+    </DataTemplate>
+  </Window.Resources>
+
+  <DockPanel>
+    <TextBlock Name="HeaderText" DockPanel.Dock="Top" Foreground="{StaticResource TextPrimary}"
+               FontSize="16" FontWeight="SemiBold" Margin="18,14,18,8"/>
+    <TabControl Background="{StaticResource BgPrimary}" Padding="6">
+      <TabItem Header="Save states">
+        <Grid Margin="12,8">
+          <ListBox Name="StatesList" Background="Transparent" BorderThickness="0"
+                   ItemTemplate="{StaticResource RowState}"
+                   ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalAlignment="Stretch"/>
+          <TextBlock Name="StatesEmpty" Foreground="{StaticResource TextSecondary}" FontStyle="Italic" Margin="4,12"
+                     Text="No save states yet — press F5 in-game to make one." IsVisible="False"/>
+        </Grid>
+      </TabItem>
+      <TabItem Header="Extras">
+        <Grid Margin="12,8" RowDefinitions="Auto,*">
+          <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="6,2,0,8">
+            <Button Name="DownloadExtrasButton" Content="Download from ScreenScraper" Padding="14,6" Click="OnDownloadExtras"/>
+            <TextBlock Name="ExtrasStatus" VerticalAlignment="Center" Margin="14,0,0,0" Foreground="{StaticResource TextSecondary}"/>
+          </StackPanel>
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <Grid>
+              <ListBox Name="ExtrasList" Background="Transparent" BorderThickness="0"
+                       ItemTemplate="{StaticResource ExtraThumb}"
+                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemsPanel>
+                  <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+              </ListBox>
+              <TextBlock Name="ExtrasEmpty" Foreground="{StaticResource TextSecondary}" FontStyle="Italic" Margin="4,12"
+                         Text="No extras yet — click Download to fetch logos, marquees, fan art, maps and screenshots." IsVisible="False"/>
+            </Grid>
+          </ScrollViewer>
+        </Grid>
+      </TabItem>
+      <TabItem Header="Media">
+        <TabControl Margin="6,6" Background="{StaticResource BgPrimary}" Padding="4">
+          <TabItem Header="Screenshots">
+            <Grid Margin="8,8">
+              <ListBox Name="ShotsList" Background="Transparent" BorderThickness="0"
+                       ItemTemplate="{StaticResource RowWithOpen}"
+                       ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalAlignment="Stretch"/>
+              <TextBlock Name="ShotsEmpty" Foreground="{StaticResource TextSecondary}" FontStyle="Italic" Margin="4,12"
+                         Text="No screenshots yet — press F12 in-game to capture one." IsVisible="False"/>
+            </Grid>
+          </TabItem>
+          <TabItem Header="Videos">
+            <Grid Margin="8,8">
+              <ListBox Name="VideosList" Background="Transparent" BorderThickness="0"
+                       ItemTemplate="{StaticResource RowWithOpen}"
+                       ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalAlignment="Stretch"/>
+              <TextBlock Name="VideosEmpty" Foreground="{StaticResource TextSecondary}" FontStyle="Italic" Margin="4,12"
+                         Text="No recordings yet — press F9 in-game to record." IsVisible="False"/>
+            </Grid>
+          </TabItem>
+        </TabControl>
+      </TabItem>
+      <TabItem Header="Display">
+        <StackPanel Margin="18,14">
+          <TextBlock Text="Frame rate" Foreground="{StaticResource TextPrimary}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,4"/>
+          <TextBlock Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontSize="11" Margin="0,0,0,6"
+                     Text="Lock the output frame rate to remove tearing and steady the picture. This caps presentation only — for a game that runs too fast, lower the CPU cycles in Preferences."/>
+          <ComboBox Name="FpsLockBox" Width="160" HorizontalAlignment="Left" SelectionChanged="OnDisplaySettingChanged"/>
+
+          <TextBlock Text="3dfx (Voodoo)" Foreground="{StaticResource TextPrimary}" FontSize="16" FontWeight="SemiBold" Margin="0,18,0,4"/>
+          <TextBlock Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" FontSize="11" Margin="0,0,0,6"
+                     Text="Hardware-OpenGL 3dfx rendering for this game. Default follows the global setting (Preferences → General)."/>
+          <ComboBox Name="Hw3dfxBox" Width="160" HorizontalAlignment="Left" SelectionChanged="OnDisplaySettingChanged"/>
+        </StackPanel>
+      </TabItem>
+      <TabItem Header="In-game saves">
+        <DockPanel Margin="12,8">
+          <TextBlock DockPanel.Dock="Top" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="2,0,2,8" FontSize="11"
+                     Text="Files in this game's save folder. Deleting a game's own save data cannot be undone."/>
+          <Grid>
+            <ListBox Name="SavesList" Background="Transparent" BorderThickness="0"
+                     ItemTemplate="{StaticResource RowWithOpen}"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalAlignment="Stretch"/>
+            <TextBlock Name="SavesEmpty" Foreground="{StaticResource TextSecondary}" FontStyle="Italic" Margin="4,12"
+                       Text="No save files recorded for this game yet." IsVisible="False"/>
+          </Grid>
+        </DockPanel>
+      </TabItem>
+      <TabItem Header="Notes">
+        <DockPanel Margin="12,8">
+          <TextBlock DockPanel.Dock="Top" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="2,0,2,6" FontSize="11"
+                     Text="Saved automatically. Stored with the game (notes.md)."/>
+          <TextBox Name="NotesBox" AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap"
+                   ScrollViewer.VerticalScrollBarVisibility="Auto" FontFamily="monospace" FontSize="13" Padding="8"/>
+        </DockPanel>
+      </TabItem>
+    </TabControl>
+  </DockPanel>
+</Window>
