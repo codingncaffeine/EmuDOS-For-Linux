@@ -46,6 +46,8 @@ public partial class App : Application
             await window.PlayFirstAsync();
         if (Environment.GetEnvironmentVariable("EMUDOS_AUTOCARD") == "1")
             window.OpenFirstCard();
+        if (Environment.GetEnvironmentVariable("EMUDOS_AUTOPREFS") == "1")
+            window.OpenPreferencesForSmoke();
 
         // Check GitHub for a newer release and surface it in the bottom bar (best-effort, non-blocking).
         _ = viewModel.CheckForUpdatesAsync();

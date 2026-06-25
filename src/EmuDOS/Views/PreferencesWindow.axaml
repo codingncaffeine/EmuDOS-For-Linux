@@ -1,0 +1,326 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:EmuDOS.ViewModels"
+        x:Class="EmuDOS.Views.PreferencesWindow"
+        Title="EmuDOS Preferences" Height="560" Width="580"
+        Icon="/Assets/emudos-linux.png"
+        Background="{StaticResource BgPrimary}" WindowStartupLocation="CenterOwner"
+        CanResize="True" MinHeight="420" MinWidth="480">
+
+  <Window.Resources>
+    <ControlTheme x:Key="FieldLabel" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+      <Setter Property="Margin" Value="0,12,0,3"/>
+    </ControlTheme>
+    <ControlTheme x:Key="Heading" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+      <Setter Property="FontSize" Value="16"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </ControlTheme>
+    <ControlTheme x:Key="Muted" TargetType="TextBlock">
+      <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+      <Setter Property="TextWrapping" Value="Wrap"/>
+    </ControlTheme>
+  </Window.Resources>
+
+  <TabControl Name="Tabs" Background="{StaticResource BgPrimary}" Padding="0">
+    <TabItem Name="GameOptionsTab" Header="Game Options">
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="22,18">
+          <TextBlock Name="GameTitle" Theme="{StaticResource Heading}"/>
+          <TextBlock Theme="{StaticResource Muted}" Margin="0,2,0,6"
+                     Text="Saved for this game only — overrides the catalog defaults and survives catalog updates."/>
+
+          <TextBlock Text="CPU speed" Theme="{StaticResource FieldLabel}"/>
+          <StackPanel Orientation="Horizontal">
+            <ComboBox Name="CpuCyclesMode" Width="150" SelectionChanged="OnCyclesModeChanged"/>
+            <TextBox Name="FixedCycles" Width="90" Margin="10,0,0,0"/>
+            <TextBlock Name="CyclesHint" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="8,0,0,0"
+                       Text="cycles (lower if a game runs too fast)"/>
+          </StackPanel>
+
+          <TextBlock Text="Machine / graphics" Theme="{StaticResource FieldLabel}"/>
+          <ComboBox Name="MachineTypeBox" Width="200" HorizontalAlignment="Left"/>
+
+          <TextBlock Text="Memory (MB)" Theme="{StaticResource FieldLabel}"/>
+          <ComboBox Name="MemoryBox" Width="120" HorizontalAlignment="Left"/>
+
+          <TextBlock Text="Sound card" Theme="{StaticResource FieldLabel}"/>
+          <ComboBox Name="SoundCardBox" Width="200" HorizontalAlignment="Left"/>
+
+          <TextBlock Text="MIDI music" Theme="{StaticResource FieldLabel}"/>
+          <ComboBox Name="MidiBox" Width="200" HorizontalAlignment="Left"/>
+
+          <CheckBox Name="AspectBox" Content="Correct aspect ratio" Margin="0,16,0,0"/>
+          <CheckBox Name="Hardware3dfxBox" Content="Hardware 3dfx (OpenGL)" Margin="0,10,0,0" Click="OnToggleHardware3dfx"
+                    ToolTip.Tip="Render 3dfx/Voodoo games through hardware OpenGL (sharper). Off uses software Voodoo. Non-3dfx games are unaffected."/>
+
+          <TextBlock Text="Display (EmuDOS)" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" Margin="0,18,0,2"/>
+          <TextBlock Theme="{StaticResource Muted}" Margin="0,0,0,6"
+                     Text="Applied by EmuDOS to the picture — the core has no brightness/gamma. Raise gamma to lift a too-dark game."/>
+
+          <DockPanel Margin="0,4,0,0">
+            <TextBlock DockPanel.Dock="Left" Text="Brightness" Width="80" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+            <TextBlock DockPanel.Dock="Right" Width="44" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" TextAlignment="Right"
+                       Text="{Binding #BrightnessSlider.Value, StringFormat='{}{0:0.00}'}"/>
+            <Slider Name="BrightnessSlider" Minimum="0.5" Maximum="1.5" Value="1"
+                    SmallChange="0.05" LargeChange="0.1" VerticalAlignment="Center"/>
+          </DockPanel>
+          <DockPanel Margin="0,8,0,0">
+            <TextBlock DockPanel.Dock="Left" Text="Gamma" Width="80" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+            <TextBlock DockPanel.Dock="Right" Width="44" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" TextAlignment="Right"
+                       Text="{Binding #GammaSlider.Value, StringFormat='{}{0:0.00}'}"/>
+            <Slider Name="GammaSlider" Minimum="0.5" Maximum="2.0" Value="1"
+                    SmallChange="0.05" LargeChange="0.1" VerticalAlignment="Center"/>
+          </DockPanel>
+
+          <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
+            <Button Content="Save" Click="OnSaveGameOptions"/>
+            <Button Content="Reset to catalog default" Margin="10,0,0,0" Click="OnResetGameOptions"/>
+            <TextBlock Name="GameOptionsStatus" Foreground="#9FE0A0" VerticalAlignment="Center" Margin="14,0,0,0"/>
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+    <TabItem Header="Snaps">
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="22,18">
+          <TextBlock Text="Box style" Theme="{StaticResource Heading}" Margin="0,0,0,4"/>
+          <TextBlock Theme="{StaticResource Muted}" Margin="0,0,0,8"
+                     Text="Show 3D box renders instead of flat 2D covers (where a 3D box has been downloaded). Right-click a game to override this for it alone."/>
+          <CheckBox Name="Use3DBox" Content="Use 3D boxes by default" Click="OnToggle3DBoxes"/>
+
+          <Border Height="1" Background="{StaticResource BorderNormal}" Margin="0,22"/>
+
+          <TextBlock Text="ScreenScraper" Theme="{StaticResource Heading}" Margin="0,0,0,4"/>
+          <TextBlock Theme="{StaticResource Muted}" Margin="0,0,0,10"
+                     Text="Log in with your screenscraper.fr account for higher box-art download limits. (Optional — basic art works without it.)"/>
+
+          <TextBlock Text="Username" Theme="{StaticResource FieldLabel}"/>
+          <TextBox Name="SsUser"/>
+
+          <TextBlock Text="Password" Theme="{StaticResource FieldLabel}"/>
+          <TextBox Name="SsPass" PasswordChar="●"/>
+
+          <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <Button Name="SsLogin" Content="Log in" Click="OnLoginScreenScraper"/>
+            <TextBlock Name="SsStatus" VerticalAlignment="Center" Margin="14,0,0,0" Foreground="{StaticResource TextSecondary}"/>
+          </StackPanel>
+
+          <Border Height="1" Background="{StaticResource BorderNormal}" Margin="0,22"/>
+
+          <TextBlock Text="SteamGridDB" Theme="{StaticResource Heading}" Margin="0,0,0,4"/>
+          <TextBlock Theme="{StaticResource Muted}" Margin="0,0,0,10"
+                     Text="Paste your API key from steamgriddb.com — used as a fallback art source for games ScreenScraper doesn't have."/>
+
+          <TextBlock Text="API Key" Theme="{StaticResource FieldLabel}"/>
+          <TextBox Name="SgdbKey"/>
+
+          <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <Button Name="SgdbLogin" Content="Log in" Click="OnLoginSteamGridDb"/>
+            <TextBlock Name="SgdbStatus" VerticalAlignment="Center" Margin="14,0,0,0" Foreground="{StaticResource TextSecondary}"/>
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+    <TabItem Header="Media">
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="22,18">
+          <TextBlock Text="Screenshots" Theme="{StaticResource Heading}" Margin="0,0,0,4"/>
+          <TextBlock Theme="{StaticResource Muted}" Margin="0,0,0,10" Text="Press F12 in-game to capture a screenshot."/>
+
+          <TextBlock Text="Save folder" Theme="{StaticResource FieldLabel}"/>
+          <DockPanel>
+            <Button DockPanel.Dock="Right" Content="Browse…" Margin="8,0,0,0" Padding="14,5" Click="OnBrowseScreenshotFolder"/>
+            <TextBox Name="ScreenshotFolderBox"/>
+          </DockPanel>
+
+          <TextBlock Text="Capture size" Theme="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
+          <ComboBox Name="ScreenshotSizeBox" Width="240" HorizontalAlignment="Left">
+            <ComboBoxItem Content="Original (game's native pixels)"/>
+            <ComboBoxItem Content="Window size (as displayed)"/>
+          </ComboBox>
+
+          <Border Height="1" Background="{StaticResource BorderNormal}" Margin="0,22"/>
+
+          <TextBlock Text="Video recording" Theme="{StaticResource Heading}" Margin="0,0,0,4"/>
+          <TextBlock Theme="{StaticResource Muted}" Margin="0,0,0,10"
+                     Text="Press F9 in-game to start/stop recording. Needs FFmpeg (your distro's ffmpeg package)."/>
+
+          <TextBlock Text="Save folder" Theme="{StaticResource FieldLabel}"/>
+          <DockPanel>
+            <Button DockPanel.Dock="Right" Content="Browse…" Margin="8,0,0,0" Padding="14,5" Click="OnBrowseVideoFolder"/>
+            <TextBox Name="VideoFolderBox"/>
+          </DockPanel>
+
+          <TextBlock Text="Quality" Theme="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
+          <ComboBox Name="VideoQualityBox" Width="240" HorizontalAlignment="Left">
+            <ComboBoxItem Content="Low"/>
+            <ComboBoxItem Content="Medium"/>
+            <ComboBoxItem Content="High"/>
+          </ComboBox>
+
+          <StackPanel Orientation="Horizontal" Margin="0,18,0,0">
+            <Button Content="Save" Click="OnSaveMedia" Padding="18,6"/>
+            <TextBlock Name="MediaStatus" Foreground="#9FE0A0" VerticalAlignment="Center" Margin="14,0,0,0"/>
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+    <TabItem Header="Hotkeys">
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="22,18">
+          <TextBlock Text="Hotkeys" Theme="{StaticResource Heading}" Margin="0,0,0,4"/>
+          <TextBlock Theme="{StaticResource Muted}" Margin="0,0,0,14"
+                     Text="Click a box and press the key you want it bound to. Press Esc to reset it to the default."/>
+
+          <TextBlock Text="Screenshot" Theme="{StaticResource FieldLabel}"/>
+          <TextBox Name="HotkeyScreenshot" Width="200" HorizontalAlignment="Left" IsReadOnly="True" Cursor="Hand" KeyDown="OnHotkeyCapture"/>
+          <TextBlock Text="Record video" Theme="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
+          <TextBox Name="HotkeyRecord" Width="200" HorizontalAlignment="Left" IsReadOnly="True" Cursor="Hand" KeyDown="OnHotkeyCapture"/>
+          <TextBlock Text="Mouse lock" Theme="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
+          <TextBox Name="HotkeyMouseLock" Width="200" HorizontalAlignment="Left" IsReadOnly="True" Cursor="Hand" KeyDown="OnHotkeyCapture"/>
+          <TextBlock Theme="{StaticResource Muted}" FontSize="11" Margin="0,4,0,0" Text="Middle-click always toggles mouse lock too."/>
+          <TextBlock Text="In-game menu (swap CDs/disks)" Theme="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
+          <TextBox Name="HotkeyMenu" Width="200" HorizontalAlignment="Left" IsReadOnly="True" Cursor="Hand" KeyDown="OnHotkeyCapture"/>
+          <TextBlock Text="Quick save state" Theme="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
+          <TextBox Name="HotkeySaveState" Width="200" HorizontalAlignment="Left" IsReadOnly="True" Cursor="Hand" KeyDown="OnHotkeyCapture"/>
+          <TextBlock Text="Quick load state" Theme="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
+          <TextBox Name="HotkeyLoadState" Width="200" HorizontalAlignment="Left" IsReadOnly="True" Cursor="Hand" KeyDown="OnHotkeyCapture"/>
+          <TextBlock Text="Cheat engine" Theme="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
+          <TextBox Name="HotkeyCheat" Width="200" HorizontalAlignment="Left" IsReadOnly="True" Cursor="Hand" KeyDown="OnHotkeyCapture"/>
+          <TextBlock Text="Fast-forward (hold)" Theme="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
+          <TextBox Name="HotkeyFastForward" Width="200" HorizontalAlignment="Left" IsReadOnly="True" Cursor="Hand" KeyDown="OnHotkeyCapture"/>
+          <TextBlock Text="Slow-motion (hold)" Theme="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
+          <TextBox Name="HotkeySlowMotion" Width="200" HorizontalAlignment="Left" IsReadOnly="True" Cursor="Hand" KeyDown="OnHotkeyCapture"/>
+          <TextBlock Text="Rewind (hold)" Theme="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
+          <TextBox Name="HotkeyRewind" Width="200" HorizontalAlignment="Left" IsReadOnly="True" Cursor="Hand" KeyDown="OnHotkeyCapture"/>
+          <TextBlock Text="Pause" Theme="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
+          <TextBox Name="HotkeyPause" Width="200" HorizontalAlignment="Left" IsReadOnly="True" Cursor="Hand" KeyDown="OnHotkeyCapture"/>
+          <TextBlock Text="Cycle video shader (CRT)" Theme="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
+          <TextBox Name="HotkeyShaderCycle" Width="200" HorizontalAlignment="Left" IsReadOnly="True" Cursor="Hand" KeyDown="OnHotkeyCapture"/>
+          <TextBlock Text="Toggle FPS overlay" Theme="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
+          <TextBox Name="HotkeyFps" Width="200" HorizontalAlignment="Left" IsReadOnly="True" Cursor="Hand" KeyDown="OnHotkeyCapture"/>
+
+          <StackPanel Orientation="Horizontal" Margin="0,18,0,0">
+            <Button Content="Save" Click="OnSaveHotkeys" Padding="18,6"/>
+            <TextBlock Name="HotkeysStatus" Foreground="#9FE0A0" VerticalAlignment="Center" Margin="14,0,0,0"/>
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+    <TabItem Header="Downloads">
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="22,18">
+          <TextBlock Text="Downloads" Theme="{StaticResource Heading}" Margin="0,0,0,4"/>
+          <TextBlock Theme="{StaticResource Muted}" Margin="0,0,0,14"
+                     Text="Components are fetched on demand rather than bundled (for size and licensing). The core is required; the catalog is optional."/>
+          <ItemsControl Name="DownloadList">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:DownloadRow">
+                <Border Background="{StaticResource BgSecondary}" BorderBrush="{StaticResource BorderNormal}"
+                        BorderThickness="1" CornerRadius="4" Padding="14,10" Margin="0,0,0,10">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                      <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold"/>
+                      <TextBlock Text="{Binding Description}" Theme="{StaticResource Muted}" FontSize="11" Margin="0,2,0,0"/>
+                      <TextBlock Text="{Binding Status}" Foreground="{Binding StatusBrush}" FontSize="11" Margin="0,4,0,0"/>
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="{Binding ActionText}" VerticalAlignment="Center"
+                            Padding="16,6" IsEnabled="{Binding CanDownload}" Click="OnDownloadClick"/>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <Border Height="1" Background="{StaticResource BorderNormal}" Margin="0,6,0,16"/>
+
+          <TextBlock Text="Roland MT-32 ROMs" Theme="{StaticResource Heading}" Margin="0,0,0,4"/>
+          <TextBlock Theme="{StaticResource Muted}" FontSize="11" Margin="0,0,0,8"
+                     Text="Roland's copyrighted firmware — we can't distribute it. Supply your own by dragging the .rom files (MT-32 or CM-32L), or a folder containing them, anywhere onto EmuDOS."/>
+          <TextBlock Name="Mt32RomStatus" FontSize="11"/>
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+    <TabItem Header="Backups">
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="22,18">
+          <TextBlock Text="Backups" Theme="{StaticResource Heading}" Margin="0,0,0,4"/>
+          <TextBlock Theme="{StaticResource Muted}" Margin="0,0,0,16"
+                     Text="Local copies you control. Gameboxes are the source of truth; the database holds your favorites, play counts and play history."/>
+
+          <TextBlock Text="Library database" Theme="{StaticResource Heading}" FontSize="13" Margin="0,0,0,6"/>
+          <StackPanel Orientation="Horizontal">
+            <Button Content="Back up database…" Padding="14,6" Click="OnBackupDatabase"/>
+            <Button Content="Restore database…" Padding="14,6" Margin="8,0,0,0" Click="OnRestoreDatabase"/>
+          </StackPanel>
+
+          <Border Height="1" Background="{StaticResource BorderNormal}" Margin="0,16"/>
+
+          <TextBlock Text="All saves &amp; save states" Theme="{StaticResource Heading}" FontSize="13" Margin="0,0,0,6"/>
+          <TextBlock Theme="{StaticResource Muted}" FontSize="11" Margin="0,0,0,8"
+                     Text="Bundle every game's saves, save states and notes into a single archive you can stash anywhere."/>
+          <Button Content="Back up all saves…" Padding="14,6" HorizontalAlignment="Left" Click="OnBackupAllSaves"/>
+
+          <TextBlock Name="BackupStatus" FontSize="11" Margin="0,16,0,0" TextWrapping="Wrap"/>
+
+          <Border Height="1" Background="{StaticResource BorderNormal}" Margin="0,18,0,16"/>
+
+          <TextBlock Text="Cloud sync (GitHub)" Theme="{StaticResource Heading}" FontSize="13" Margin="0,0,0,4"/>
+          <TextBlock Theme="{StaticResource Muted}" FontSize="11" Margin="0,0,0,8"
+                     Text="Sync save states and notes to your own private GitHub repo. Screenshots and videos stay local."/>
+          <TextBlock Name="CloudStatus" FontSize="12" Margin="0,0,0,8" TextWrapping="Wrap" Foreground="{StaticResource TextSecondary}"/>
+          <StackPanel Orientation="Horizontal">
+            <Button Name="ConnectButton" Content="Connect to GitHub…" Padding="14,6" Click="OnConnectGitHub"/>
+            <Button Name="SyncNowButton" Content="Sync now" Padding="14,6" Margin="8,0,0,0" IsEnabled="False" Click="OnSyncNow"/>
+            <Button Name="DisconnectButton" Content="Disconnect" Padding="14,6" Margin="8,0,0,0" IsVisible="False" Click="OnDisconnect"/>
+          </StackPanel>
+
+          <TextBlock Text="Encrypt cloud saves (optional)" Theme="{StaticResource FieldLabel}" Margin="0,14,0,2"/>
+          <TextBox Name="CloudPassphrase" Width="280" HorizontalAlignment="Left"/>
+          <TextBlock Theme="{StaticResource Muted}" FontSize="11" Margin="0,3,0,0"
+                     Text="A passphrase encrypts your saves before upload, so only you can read them in the cloud. Use the same passphrase on every PC. Leave blank for none — set it before your first sync."/>
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+    <TabItem Header="About">
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="22,18">
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+            <Image Source="/Assets/emudos-linux.png" Width="64" Height="64" VerticalAlignment="Top"
+                   RenderOptions.BitmapInterpolationMode="HighQuality"/>
+            <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
+              <TextBlock Text="EmuDOS" Theme="{StaticResource Heading}" FontSize="20" Margin="0,0,0,2"/>
+              <TextBlock Theme="{StaticResource Muted}" TextWrapping="Wrap" MaxWidth="360"
+                         Text="A Boxer-style shelf for your DOS games, powered by the dosbox_pure libretro core."/>
+            </StackPanel>
+          </StackPanel>
+
+          <TextBlock Name="VersionText" Theme="{StaticResource Heading}" FontSize="13" Margin="0,0,0,2" Text="Version"/>
+          <TextBlock Name="LatestVersionText" Theme="{StaticResource Muted}" FontSize="12" Margin="0,0,0,10"
+                     Text="Latest on GitHub: not checked yet."/>
+          <StackPanel Orientation="Horizontal">
+            <Button Name="CheckUpdatesButton" Content="Check for updates" Padding="14,6" Click="OnCheckForUpdates"/>
+            <Button Name="UpdateNowButton" Content="Update now" Padding="14,6" Margin="8,0,0,0" IsVisible="False" Click="OnUpdateNow"/>
+            <Button Content="Releases on GitHub" Padding="14,6" Margin="8,0,0,0" Click="OnOpenReleases"/>
+          </StackPanel>
+
+          <CheckBox Name="CheckUpdatesBox" Content="Check for updates on startup" Margin="0,14,0,0" Click="OnToggleCheckForUpdates"/>
+
+          <Border Height="1" Background="{StaticResource BorderNormal}" Margin="0,18,0,16"/>
+
+          <TextBlock Text="Credits" Theme="{StaticResource Heading}" FontSize="13" Margin="0,0,0,6"/>
+          <TextBlock Theme="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap"
+                     Text="Emulation by the dosbox_pure libretro core. Video playback via LibVLC (VideoLAN). Artwork and metadata from ScreenScraper."/>
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+  </TabControl>
+</Window>
