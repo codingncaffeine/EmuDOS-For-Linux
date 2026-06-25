@@ -134,5 +134,18 @@
         <TextBlock Text="{Binding CloudSyncStatus}" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
       </Border>
     </StackPanel>
+
+    <!-- Hover preview: a Trinitron monitor showing the game's video snap (video behind the frame's
+         transparent screen). Positioned + filled in code on hover. -->
+    <Popup Name="HoverPopup" Placement="Right" IsLightDismissEnabled="False">
+      <Grid Width="360" Height="345">
+        <Grid.Effect>
+          <DropShadowEffect BlurRadius="16" OffsetX="0" OffsetY="4" Color="Black" Opacity="0.6"/>
+        </Grid.Effect>
+        <Image Name="HoverVideo" Margin="41,38,40,80" Stretch="Fill"
+               RenderOptions.BitmapInterpolationMode="LowQuality"/>
+        <Image Source="/Assets/monitor.png" Stretch="Fill"/>
+      </Grid>
+    </Popup>
   </Grid>
 </Window>

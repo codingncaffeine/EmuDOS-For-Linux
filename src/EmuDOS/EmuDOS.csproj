@@ -7,6 +7,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- AVLN3001: windows with only a parameterized constructor (EmulatorWindow, GameDetailWindow)
+         aren't reachable via the runtime XAML loader. That's intended — they're constructed in code
+         with their required dependencies and use compiled XAML, never the reflection loader. -->
+    <NoWarn>$(NoWarn);AVLN3001</NoWarn>
     <ApplicationIcon>Assets\EmuDOS.ico</ApplicationIcon>
     <!-- The Linux port's own release line (pre-1.0 while features stabilize against upstream).
          Surfaced in Preferences → About and as the release tag. -->
@@ -24,6 +28,7 @@
          Avalonia resource namespace so the shelf background and 3D/2D defaults resolve at /Assets/…. -->
     <AvaloniaResource Include="..\..\Assets\bookshelf.png" Link="Assets\bookshelf.png" />
     <AvaloniaResource Include="..\..\Assets\bookshelf2.png" Link="Assets\bookshelf2.png" />
+    <AvaloniaResource Include="..\..\Assets\monitor.png" Link="Assets\monitor.png" />
   </ItemGroup>
 
   <ItemGroup>

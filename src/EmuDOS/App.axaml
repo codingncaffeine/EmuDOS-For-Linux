@@ -9,6 +9,7 @@
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
         <ResourceInclude Source="/Themes/Theme.axaml" />
+        <ResourceInclude Source="/Themes/Controls.axaml" />
       </ResourceDictionary.MergedDictionaries>
       <!-- Drive Fluent's accent (selection, focus, ComboBox highlight) with the EmuDOS red. -->
       <Color x:Key="SystemAccentColor">#E03535</Color>

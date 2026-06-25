@@ -1,0 +1,174 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!--
+    EmuDOS control templates, ported 1:1 from the Windows Themes/Theme.xaml so the Linux build is
+    visually indistinguishable from the WPF app. WPF implicit Styles → Avalonia ControlThemes keyed
+    by {x:Type …} (so they become the default theme for the type); WPF ControlTemplate.Triggers →
+    Avalonia pseudo-class selectors (:pointerover / :pressed / :disabled / :checked).
+  -->
+
+  <!-- Button: flat dark fill, grey hover, darker press, 4px corners. -->
+  <ControlTheme x:Key="{x:Type Button}" TargetType="Button">
+    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    <Setter Property="Background" Value="{StaticResource ButtonBg}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource ButtonBorder}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Padding" Value="14,6"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="b" Background="{TemplateBinding Background}"
+                BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}"
+                CornerRadius="4">
+          <ContentPresenter Name="PART_ContentPresenter"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                            Margin="{TemplateBinding Padding}"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover /template/ Border#b">
+      <Setter Property="Background" Value="{StaticResource ButtonHoverBg}"/>
+    </Style>
+    <Style Selector="^:pressed /template/ Border#b">
+      <Setter Property="Background" Value="{StaticResource ButtonPressedBg}"/>
+    </Style>
+    <Style Selector="^:disabled">
+      <Setter Property="Opacity" Value="0.45"/>
+    </Style>
+  </ControlTheme>
+
+  <!-- TextBox: flat dark box, 1px border, no Fluent focus underline. (Avalonia TextBox with a
+       PasswordChar also covers the WPF PasswordBox, which has no Avalonia equivalent.) -->
+  <ControlTheme x:Key="{x:Type TextBox}" TargetType="TextBox">
+    <Setter Property="Background" Value="{StaticResource BgTertiary}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource BorderNormal}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Padding" Value="6,5"/>
+    <Setter Property="CaretBrush" Value="{StaticResource TextPrimary}"/>
+    <Setter Property="SelectionBrush" Value="{StaticResource Accent}"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4">
+          <DockPanel Margin="{TemplateBinding Padding}">
+            <ScrollViewer Name="PART_ScrollViewer"
+                          HorizontalScrollBarVisibility="{TemplateBinding (ScrollViewer.HorizontalScrollBarVisibility)}"
+                          VerticalScrollBarVisibility="{TemplateBinding (ScrollViewer.VerticalScrollBarVisibility)}">
+              <Panel>
+                <TextBlock Name="PART_Watermark" Text="{TemplateBinding Watermark}" Opacity="0.6"
+                           Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"
+                           TextAlignment="{TemplateBinding TextAlignment}"
+                           IsVisible="{TemplateBinding Text, Converter={x:Static StringConverters.IsNullOrEmpty}}"/>
+                <TextPresenter Name="PART_TextPresenter"
+                               Text="{TemplateBinding Text, Mode=TwoWay}"
+                               CaretIndex="{TemplateBinding CaretIndex}"
+                               SelectionStart="{TemplateBinding SelectionStart}"
+                               SelectionEnd="{TemplateBinding SelectionEnd}"
+                               TextAlignment="{TemplateBinding TextAlignment}"
+                               TextWrapping="{TemplateBinding TextWrapping}"
+                               PasswordChar="{TemplateBinding PasswordChar}"
+                               RevealPassword="{TemplateBinding RevealPassword}"
+                               SelectionBrush="{TemplateBinding SelectionBrush}"
+                               SelectionForegroundBrush="{TemplateBinding SelectionForegroundBrush}"
+                               CaretBrush="{TemplateBinding CaretBrush}"
+                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+              </Panel>
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:disabled">
+      <Setter Property="Opacity" Value="0.45"/>
+    </Style>
+  </ControlTheme>
+
+  <!-- CheckBox: dark box, accent check glyph + accent border when checked. -->
+  <ControlTheme x:Key="{x:Type CheckBox}" TargetType="CheckBox">
+    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <StackPanel Orientation="Horizontal" Background="Transparent">
+          <Border Name="box" Width="16" Height="16" CornerRadius="3" VerticalAlignment="Center"
+                  Background="{StaticResource BgTertiary}" BorderBrush="{StaticResource BorderNormal}"
+                  BorderThickness="1">
+            <Path Name="check" IsVisible="False" Margin="3" Stretch="Uniform"
+                  Stroke="{StaticResource Accent}" StrokeThickness="2" Data="M0,3 L2,5 L6,0"/>
+          </Border>
+          <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                            Margin="8,0,0,0" VerticalAlignment="Center"/>
+        </StackPanel>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:checked /template/ Path#check">
+      <Setter Property="IsVisible" Value="True"/>
+    </Style>
+    <Style Selector="^:checked /template/ Border#box">
+      <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
+    </Style>
+  </ControlTheme>
+
+  <!-- ComboBoxItem: flat dark row, BgTertiary on hover/selected. -->
+  <ControlTheme x:Key="{x:Type ComboBoxItem}" TargetType="ComboBoxItem">
+    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    <Setter Property="Padding" Value="8,5"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="b" Background="Transparent" Padding="{TemplateBinding Padding}" CornerRadius="3">
+          <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover /template/ Border#b">
+      <Setter Property="Background" Value="{StaticResource BgTertiary}"/>
+    </Style>
+    <Style Selector="^:selected /template/ Border#b">
+      <Setter Property="Background" Value="{StaticResource BgTertiary}"/>
+    </Style>
+  </ControlTheme>
+
+  <!-- ComboBox: dark closed box with a triangle, dark popup list. -->
+  <ControlTheme x:Key="{x:Type ComboBox}" TargetType="ComboBox">
+    <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+    <Setter Property="Height" Value="28"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="HorizontalContentAlignment" Value="Left"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Grid ColumnDefinitions="*,Auto">
+          <Border Name="b" Grid.ColumnSpan="2" Background="{StaticResource BgTertiary}"
+                  BorderBrush="{StaticResource BorderNormal}" BorderThickness="1" CornerRadius="4"/>
+          <ContentControl Grid.Column="0" Margin="9,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
+                          Foreground="{StaticResource TextPrimary}"
+                          Content="{TemplateBinding SelectionBoxItem}"/>
+          <Path Grid.Column="1" Margin="0,0,9,0" VerticalAlignment="Center" HorizontalAlignment="Right"
+                Fill="{StaticResource TextSecondary}" Data="M0,0 L8,0 L4,5 Z"/>
+          <Popup Name="PART_Popup" Grid.ColumnSpan="2" Placement="Bottom" IsLightDismissEnabled="True"
+                 IsOpen="{TemplateBinding IsDropDownOpen, Mode=TwoWay}"
+                 MinWidth="{Binding Bounds.Width, RelativeSource={RelativeSource TemplatedParent}}">
+            <Border Background="{StaticResource BgSecondary}" BorderBrush="{StaticResource BorderNormal}"
+                    BorderThickness="1" CornerRadius="4" Padding="2" MaxHeight="320">
+              <ScrollViewer>
+                <ItemsPresenter Name="PART_ItemsPresenter"/>
+              </ScrollViewer>
+            </Border>
+          </Popup>
+        </Grid>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:disabled">
+      <Setter Property="Opacity" Value="0.45"/>
+    </Style>
+  </ControlTheme>
+
+</ResourceDictionary>

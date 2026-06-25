@@ -44,6 +44,8 @@ public partial class App : Application
         }
         if (Environment.GetEnvironmentVariable("EMUDOS_AUTOPLAY") == "1")
             await window.PlayFirstAsync();
+        if (Environment.GetEnvironmentVariable("EMUDOS_AUTOCARD") == "1")
+            window.OpenFirstCard();
 
         // Check GitHub for a newer release and surface it in the bottom bar (best-effort, non-blocking).
         _ = viewModel.CheckForUpdatesAsync();
