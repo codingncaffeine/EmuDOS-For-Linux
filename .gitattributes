@@ -1,0 +1,9 @@
+# GitHub Linguist — keep the repo's language stats reflecting the actual application (C#).
+#
+# Everything under src/native/ is native interop scaffolding around bundled third-party
+# libraries, not EmuDOS's own source language:
+#   * mt32emu.h         — the verbatim upstream Munt MT-32 emulator C API header (LGPL)
+#   * emudos_mt32.cpp   — a thin C++ shim over that header
+#   * fetch/build*      — fetch and build scripts for the bundled native libs
+# Marking it vendored stops ~10k lines of C/C++ headers from dwarfing the C# stats.
+src/native/** linguist-vendored
