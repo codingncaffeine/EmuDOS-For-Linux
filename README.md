@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src/EmuDOS/Assets/EmuDOS-Logo.png" alt="EmuDOS" width="420">
+  <img src="[src/EmuDOS/Assets/EmuDOS-Logo.png](https://imgur.com/a/DZQGB5Q)" alt="EmuDOS" width="420">
 </p>
 
 <p align="center">
