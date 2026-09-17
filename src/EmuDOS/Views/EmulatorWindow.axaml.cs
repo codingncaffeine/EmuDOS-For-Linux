@@ -734,7 +734,7 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
             var dir = new Core.Library.Gamebox(_instance.GameboxPath).ScreenshotsDir;
             Directory.CreateDirectory(dir);
             var path = Path.Combine(dir, $"{SafeName(_instance.Profile.Title)} {DateTime.Now:yyyy-MM-dd HH-mm-ss}.png");
-            _bitmap.Save(path);
+            _bitmap.Save(path, PngBitmapEncoderOptions.Default);
             ShowHint("Screenshot saved", 1.0);
         }
         catch (Exception ex)
@@ -853,11 +853,11 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
             {
                 int th = Math.Max(1, (int)(h * (targetW / (double)w)));
                 using var scaled = _bitmap.CreateScaledBitmap(new PixelSize(targetW, th));
-                scaled.Save(ms);
+                scaled.Save(ms, PngBitmapEncoderOptions.Default);
             }
             else
             {
-                _bitmap.Save(ms);
+                _bitmap.Save(ms, PngBitmapEncoderOptions.Default);
             }
             return ms.ToArray();
         }

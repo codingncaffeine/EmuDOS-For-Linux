@@ -492,7 +492,7 @@ public sealed partial class MainViewModel : ObservableObject
             using var input = new MemoryStream(bytes);
             using var bmp = new Bitmap(input);
             using var output = new MemoryStream();
-            bmp.Save(output);
+            bmp.Save(output, PngBitmapEncoderOptions.Default);
             return output.ToArray();
         }
         catch
