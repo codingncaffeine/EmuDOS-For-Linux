@@ -30,9 +30,13 @@ public sealed record AppUpdate(
 ///   SelfContained — exe dir is user-writable (tarball extract): download tarball → extract to
 ///       .update-staging → spawn a detached script that waits for our exit, copies staging over the
 ///       install (replacing the running binary only once we're gone — avoids ETXTBSY), and relaunches.
-///   Deb — exe lives under /usr/: download the .deb → `pkexec dpkg -i` (GUI auth) → relaunch.
+///   Deb — exe lives under /usr/ AND dpkg registered it (the emudos .deb): download the .deb →
+///       `pkexec dpkg -i` (GUI auth) → relaunch.
+///   PackageManaged — exe lives under /usr/ but dpkg doesn't own it (e.g. the AUR's emudos-bin):
+///       never touched here — dpkg would overwrite another package manager's files. The user
+///       updates through that package manager.
 ///   Dev — running from a build tree (bin/Release|Debug): the About tab says "update via git".
-///   ReadOnly — unwritable non-/usr dir: fall back to the releases page.
+///   ReadOnly — unwritable dir outside the package-managed tree: fall back to the releases page.
 ///
 /// EMUDOS_UPDATE_API overrides the releases/latest endpoint for integration tests.
 /// </summary>
@@ -46,7 +50,9 @@ public static class UpdateService
     private static string LatestApi =>
         Environment.GetEnvironmentVariable("EMUDOS_UPDATE_API") ?? DefaultLatestApi;
 
-    public enum InstallKind { Dev, Deb, SelfContained, ReadOnly }
+    public enum InstallKind { Dev, Deb, PackageManaged, SelfContained, ReadOnly }
+
+    private const string DpkgInfoDir = "/var/lib/dpkg/info";
 
     public sealed record ReleaseAsset(string Name, string Url, long Size, string? Digest = null);
 
@@ -60,22 +66,50 @@ public static class UpdateService
 
     private static string ExeFolder => AppContext.BaseDirectory.TrimEnd('/');
 
-    public static InstallKind DetectInstallKind()
+    public static InstallKind DetectInstallKind() => DetectInstallKind(ExeFolder, DpkgInfoDir);
+
+    /// <summary>Classifies the install in <paramref name="exeFolder"/>. <paramref name="dpkgInfoDir"/> is
+    /// dpkg's per-package file lists (/var/lib/dpkg/info); a parameter so tests can supply their own.</summary>
+    public static InstallKind DetectInstallKind(string exeFolder, string dpkgInfoDir)
     {
-        var dir = ExeFolder.Replace('\\', '/');
+        var dir = exeFolder.Replace('\\', '/').TrimEnd('/');
         if (dir.Contains("/bin/Release/") || dir.Contains("/bin/Debug/")
             || dir.EndsWith("/bin/Release") || dir.EndsWith("/bin/Debug"))
             return InstallKind.Dev;
-        if (dir.StartsWith("/usr/"))
-            return InstallKind.Deb;
+        // /usr belongs to the system package manager — /usr/local excepted, which is the admin's own.
+        // Only the copy dpkg itself installed may be updated through dpkg: on Arch (which can have
+        // dpkg installed too) the same path belongs to pacman.
+        if (dir.StartsWith("/usr/") && !dir.StartsWith("/usr/local/"))
+            return DpkgOwns(dir + "/EmuDOS", dpkgInfoDir) ? InstallKind.Deb : InstallKind.PackageManaged;
         try
         {
-            var probe = Path.Combine(ExeFolder, ".write-probe");
+            var probe = Path.Combine(dir, ".write-probe");
             File.WriteAllText(probe, "");
             File.Delete(probe);
             return InstallKind.SelfContained;
         }
         catch { return InstallKind.ReadOnly; }
+    }
+
+    // The emudos .deb registers its files in dpkg's database: emudos.list, or emudos:<arch>.list.
+    private static bool DpkgOwns(string file, string dpkgInfoDir)
+    {
+        try
+        {
+            if (!Directory.Exists(dpkgInfoDir))
+                return false;
+            foreach (var list in Directory.EnumerateFiles(dpkgInfoDir, "emudos*.list"))
+            {
+                var package = Path.GetFileNameWithoutExtension(list);
+                if (package != "emudos" && !package.StartsWith("emudos:", StringComparison.Ordinal))
+                    continue;
+                foreach (var line in File.ReadLines(list))
+                    if (line == file)
+                        return true;
+            }
+        }
+        catch { /* unreadable database: not provably dpkg's */ }
+        return false;
     }
 
     /// <summary>The latest GitHub release with a self-update verdict, or null if it couldn't be checked
@@ -144,6 +178,8 @@ public static class UpdateService
     {
         if (update.Kind is InstallKind.Dev)
             throw new InvalidOperationException("This is a development build — update with git, not the in-app updater.");
+        if (update.Kind is InstallKind.PackageManaged)
+            throw new InvalidOperationException("EmuDOS was installed by your package manager — update it there.");
         if (update.Kind is InstallKind.ReadOnly)
             throw new InvalidOperationException("This install location isn't writable — update from the releases page or your package manager.");
         if (update.Asset is not { } asset || string.IsNullOrEmpty(asset.Url))

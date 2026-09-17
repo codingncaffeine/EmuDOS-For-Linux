@@ -269,7 +269,9 @@ public sealed partial class MainViewModel : ObservableObject
         if (release is { IsNewer: true })
         {
             _pendingUpdate = release;
-            UpdateMessage = $"Update available — EmuDOS {release.Tag.TrimStart('v', 'V')} (click to install)";
+            UpdateMessage = release.Kind == UpdateService.InstallKind.PackageManaged
+                ? $"Update available — EmuDOS {release.Tag.TrimStart('v', 'V')} (update it with your package manager)"
+                : $"Update available — EmuDOS {release.Tag.TrimStart('v', 'V')} (click to install)";
             UpdateAvailable = true;
         }
     }

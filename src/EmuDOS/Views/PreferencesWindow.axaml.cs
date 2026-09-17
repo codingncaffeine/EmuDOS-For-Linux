@@ -511,10 +511,13 @@ public partial class PreferencesWindow : Window
             return;
         }
         var tag = release.Tag.TrimStart('v', 'V');
-        LatestVersionText.Text = release.IsNewer
-            ? $"Latest on GitHub: {tag} — update available."
-            : $"Latest on GitHub: {tag} — you're up to date.";
-        UpdateNowButton.IsVisible = release.IsNewer;
+        bool viaPackageManager = release.Kind == UpdateService.InstallKind.PackageManaged;
+        LatestVersionText.Text = !release.IsNewer
+            ? $"Latest on GitHub: {tag} — you're up to date."
+            : viaPackageManager
+                ? $"Latest on GitHub: {tag} — update available. Update EmuDOS with your package manager."
+                : $"Latest on GitHub: {tag} — update available.";
+        UpdateNowButton.IsVisible = release.IsNewer && !viaPackageManager;
     }
 
     private async void OnUpdateNow(object? sender, RoutedEventArgs e)

@@ -21,6 +21,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\EmuDOS.Core\EmuDOS.Core.csproj" />
     <ProjectReference Include="..\..\src\EmuDOS.Metadata\EmuDOS.Metadata.csproj" />
+    <!-- The app itself, for its non-UI services (UpdateService install detection). -->
+    <ProjectReference Include="..\..\src\EmuDOS\EmuDOS.csproj" />
   </ItemGroup>
 
 </Project>
