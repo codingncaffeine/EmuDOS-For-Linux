@@ -28,8 +28,10 @@ public sealed class AppServices
         SystemFiles = new SystemFileInstaller(Paths);
         Catalog = new CatalogDatabase(System.IO.Path.Combine(Paths.CatalogDir, "catalog.db"));
         Resolver = new ProfileResolver(Catalog);
-        Import = new ImportPipeline(Paths, Store, Resolver);
         Downloads = new DownloadService(new HttpClient(), Paths);
+        // A weak executable guess gets a short headless trial boot (once the core is downloaded).
+        Import = new ImportPipeline(Paths, Store, Resolver, new ProcessTrialBooter(() =>
+            Downloads.IsInstalled(AssetManifest.DosBoxPure) ? Downloads.InstalledPath(AssetManifest.DosBoxPure) : null));
         CatalogUpdater = new CatalogUpdater(Catalog, Downloads);
 
         _screenScraperHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };

@@ -19,12 +19,12 @@ public class GameStateTests
             WindowWidth = 800,
             WindowHeight = 640,
             Fullscreen = true,
-            InstalledExecutable = @"ZQ\ZQ.EXE",
+            LearnedExecutable = @"ZQ\ZQ.EXE",
         });
         var read = store.ReadState(box);
 
         Assert.True(read.Fullscreen);
-        Assert.Equal(@"ZQ\ZQ.EXE", read.InstalledExecutable);
+        Assert.Equal(@"ZQ\ZQ.EXE", read.LearnedExecutable);
         Assert.Equal((800, 640), (read.WindowWidth, read.WindowHeight));
     }
 

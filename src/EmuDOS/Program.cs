@@ -22,6 +22,13 @@ sealed class Program
             return;
         }
 
+        // Import trial boot (no Avalonia/window): EmuDOS --trial-boot <core.so> <content> <program>.
+        if (args is ["--trial-boot", var trialCore, var trialContent, var trialProgram, ..])
+        {
+            Environment.Exit(EmuDOS.Services.TrialBootHost.Run(trialCore, trialContent, trialProgram));
+            return;
+        }
+
         // Headless host validation (no Avalonia/window): EmuDOS --selftest-core <core.so>.
         if (args is ["--selftest-core", var corePath, ..])
         {

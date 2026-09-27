@@ -13,7 +13,8 @@ namespace EmuDOS.Core.Import;
 /// <see cref="ProfileResolver"/> is supplied, a recognized game is enriched with its curated
 /// config on the way in.
 /// </summary>
-public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileResolver? resolver = null)
+public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileResolver? resolver = null,
+                                    ITrialBooter? trialBooter = null)
     : IImportPipeline
 {
     private static readonly string[] ArchiveExtensions = [".zip", ".rar", ".7z"];
@@ -169,6 +170,21 @@ public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileRe
                 launchSource = LaunchSource.PackageScript;
             }
 
+            // A weak guess gets a short trial boot: a candidate that drops straight back to DOS (a usage
+            // message, "run SETUP first", a tool) gives way to the next one that keeps running.
+            IReadOnlyList<string> trialRejected = [];
+            if (trialBooter is not null && discMount is null && launchSource == LaunchSource.Guess
+                && classification == ImportClassification.ReadyToPlay && profile.Launch.PreCommands.Count == 0)
+            {
+                var trial = await TrialPickAsync(box.ContentDir, executables, title, cancellationToken);
+                if (trial.Winner is { } winner)
+                {
+                    chosen = DosExecutables.ResolveBatRedirect(box.ContentDir, winner);
+                    profile = profile with { Launch = profile.Launch with { Executable = chosen } };
+                }
+                trialRejected = trial.Rejected;
+            }
+
             // A folder/zip game with its own files PLUS a bundled CD image (e.g. a cd\*.cue) needs
             // that disc mounted as D:, or it asks for "disk 1" / fails its CD check. Done after the
             // resolver, whose curated launch can drop pre-commands.
@@ -179,6 +195,9 @@ public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileRe
             profile = EnsureBundledDiscMounted(profile, box.ContentDir);
 
             store.WriteProfile(gameboxPath, profile);
+            // Launch re-guesses the program every time; a trial boot's verdict has to outlive that.
+            if (trialRejected.Count > 0 && chosen is not null)
+                store.WriteState(gameboxPath, store.ReadState(gameboxPath) with { LearnedExecutable = chosen });
 
             return new ImportResult
             {
@@ -191,6 +210,7 @@ public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileRe
                 Title = profile.Title,
                 CatalogRecognized = recognized,
                 LaunchSource = launchSource,
+                TrialRejected = trialRejected,
             };
         }
         catch (Exception ex)
@@ -564,6 +584,41 @@ public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileRe
             File.Move(src, dest);
         }
         return destName;
+    }
+
+    // Most candidates a trial boot tries (each costs a few seconds of emulation).
+    private const int MaxTrials = 3;
+
+    /// <summary>
+    /// Try the guessed program and, when it goes straight back to DOS, the next candidates. Winner is
+    /// the first that keeps running when it is not the guess (null keeps the guess); Rejected lists
+    /// the candidates that returned to DOS before it. Skipped for a strong guess (an exact title word
+    /// or a known launcher name), a single candidate, or content with a disc image, which the trial
+    /// does not mount.
+    /// </summary>
+    private async Task<(string? Winner, IReadOnlyList<string> Rejected)> TrialPickAsync(
+        string contentDir, IReadOnlyList<string> executables, string title, CancellationToken cancellationToken)
+    {
+        if (Directory.EnumerateFiles(contentDir, "*", SearchOption.AllDirectories)
+            .Any(f => RootableDiscExts.Contains(Path.GetExtension(f).ToLowerInvariant())))
+            return (null, []);
+        var candidates = ExecutableGuesser.Candidates(executables, title, contentDir);
+        if (candidates.Count < 2
+            || DosExecutables.TitleMatchStrength(candidates[0], title) == 3
+            || DosExecutables.IsKnownLauncher(candidates[0]))
+            return (null, []);
+
+        var rejected = new List<string>();
+        foreach (var candidate in candidates.Take(MaxTrials))
+        {
+            var outcome = await trialBooter!.BootAsync(contentDir, candidate, cancellationToken);
+            if (outcome == TrialOutcome.StillRunning)
+                return rejected.Count == 0 ? (null, []) : (candidate, rejected);
+            if (outcome == TrialOutcome.Unavailable)
+                return (null, []);
+            rejected.Add(candidate);
+        }
+        return (null, []); // every candidate went back to DOS: keep the guess
     }
 
     /// <summary>The executable heuristics alone (see <see cref="ExecutableGuesser"/>), as import applies

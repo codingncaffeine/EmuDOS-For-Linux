@@ -48,16 +48,18 @@ public static class InstallLearner
     private static InstallLearning? LearnFromContent(string contentDir, string saveDir, GameProfile profile,
                                                      GameUserState state, ProfileResolver? resolver)
     {
-        if (state.InstalledExecutable is { } known
-            && File.Exists(Path.Combine(contentDir, known.Replace('\\', '/'))))
-            return null; // learned before and still there
-
         // Programs the sessions created or changed since the content was first snapshotted.
         var produced = ContentBaseline.DiffSaves(contentDir, saveDir)
             .Where(IsProgram)
             .Select(p => p.Replace('/', '\\'))
             .ToList();
         if (produced.Count == 0)
+            return null;
+
+        // Learned from these same installed files before (a program a trial boot picked from the
+        // original files at import is not; an install that happens later replaces it).
+        if (state.LearnedExecutable is { } known && produced.Contains(known, StringComparer.OrdinalIgnoreCase)
+            && File.Exists(Path.Combine(contentDir, known.Replace('\\', '/'))))
             return null;
 
         var all = Directory.EnumerateFiles(contentDir, "*", SearchOption.AllDirectories)

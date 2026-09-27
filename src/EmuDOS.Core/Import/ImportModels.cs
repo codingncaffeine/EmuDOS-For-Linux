@@ -61,6 +61,10 @@ public sealed record ImportResult
     /// <summary>Where <see cref="ChosenExecutable"/> (or the launch recipe) came from.</summary>
     public LaunchSource LaunchSource { get; init; }
 
+    /// <summary>Programs a trial boot tried first that went straight back to DOS (empty when the first
+    /// guess kept running, or no trial ran).</summary>
+    public IReadOnlyList<string> TrialRejected { get; init; } = [];
+
     /// <summary>A non-fatal note to surface to the user (e.g. an unsupported disc format).</summary>
     public string? Warning { get; init; }
 }

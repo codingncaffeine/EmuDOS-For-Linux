@@ -2,6 +2,7 @@ using System.IO.Compression;
 using EmuDOS.Core.Catalog;
 using EmuDOS.Core.Import;
 using EmuDOS.Core.Library;
+using EmuDOS.Core.Infrastructure;
 using EmuDOS.Core.Model;
 
 namespace EmuDOS.Tests;
@@ -48,7 +49,7 @@ public class InstallLearnerTests
         ContentBaseline.Capture(content, saves);
         Write(content, "ZQ/ZQ.EXE", 60000);
 
-        var state = new GameUserState { InstalledExecutable = @"ZQ\ZQ.EXE" };
+        var state = new GameUserState { LearnedExecutable = @"ZQ\ZQ.EXE" };
 
         Assert.Null(InstallLearner.Learn(content, saves, Profile("Zeta Quest"), state, null));
     }
@@ -160,5 +161,53 @@ public class InstallLearnerTests
     {
         using var stream = archive.CreateEntry(name).Open();
         stream.Write(new byte[size]);
+    }
+}
+
+public class LearnedProgramTests
+{
+    [Fact]
+    public void A_later_install_replaces_a_program_a_trial_picked_from_the_original_files()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "emudos-tests", Guid.NewGuid().ToString("N"));
+        var content = Path.Combine(root, "content");
+        var saves = Path.Combine(root, "saves");
+        Directory.CreateDirectory(content);
+        Directory.CreateDirectory(saves);
+        File.WriteAllBytes(Path.Combine(content, "ZQRUN.EXE"), new byte[40000]);
+        File.WriteAllBytes(Path.Combine(content, "INSTALL.BAT"), new byte[100]);
+        ContentBaseline.Capture(content, saves);
+        Directory.CreateDirectory(Path.Combine(content, "ZQ"));
+        File.WriteAllBytes(Path.Combine(content, "ZQ", "ZQGAME.EXE"), new byte[90000]);
+
+        var learned = InstallLearner.Learn(content, saves, new GameProfile { Title = "Zeta" },
+            new GameUserState { LearnedExecutable = "ZQRUN.EXE" }, resolver: null);
+
+        Assert.Equal(@"ZQ\ZQGAME.EXE", learned?.Program);
+    }
+
+    [Fact]
+    public async Task A_trial_verdict_is_remembered_for_launch()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "emudos-tests", Guid.NewGuid().ToString("N"));
+        var source = Path.Combine(root, "Zeta");
+        Directory.CreateDirectory(source);
+        File.WriteAllBytes(Path.Combine(source, "ZQBIG.EXE"), new byte[90000]);
+        File.WriteAllBytes(Path.Combine(source, "ZQRUN.EXE"), new byte[40000]);
+        var store = new GameboxStore();
+        var booter = new ScriptedBooter(("ZQBIG.EXE", TrialOutcome.ReturnedToDos));
+        var pipeline = new ImportPipeline(new AppPaths(Path.Combine(root, "data")), store, trialBooter: booter);
+
+        var result = await pipeline.ImportAsync(source);
+
+        Assert.Equal("ZQRUN.EXE", store.ReadState(result.GameboxPath!).LearnedExecutable);
+    }
+
+    private sealed class ScriptedBooter(params (string Program, TrialOutcome Outcome)[] script) : ITrialBooter
+    {
+        public Task<TrialOutcome> BootAsync(string contentDir, string executable, CancellationToken cancellationToken = default) =>
+            Task.FromResult(script.FirstOrDefault(s => s.Program == executable) is { Program: not null } hit
+                ? hit.Outcome
+                : TrialOutcome.StillRunning);
     }
 }

@@ -59,9 +59,46 @@ public static class ExecutableGuesser
     }
 
     private static string PickGame(List<string> games, List<string> real, string title,
-                                   IReadOnlyList<string> all, Func<string, long> sizeOf)
+                                   IReadOnlyList<string> all, Func<string, long> sizeOf) =>
+        RankGames(games, real, title, all, sizeOf)[0];
+
+    /// <summary>
+    /// Every game program in the content, most likely first — the order <see cref="Guess"/> picks
+    /// from (its pick is the first entry). Empty when the content holds no game yet (only an
+    /// installer, or nothing runnable). Lets a trial boot fall back to the next candidate.
+    /// </summary>
+    public static IReadOnlyList<string> Candidates(
+        IReadOnlyList<string> executables, string title, string? contentDir = null,
+        IReadOnlyDictionary<string, long>? sizes = null)
     {
-        var titled = games
+        ArgumentNullException.ThrowIfNull(executables);
+        long SizeOf(string relPath) => Size(contentDir, sizes, relPath);
+        var usable = executables
+            .Where(e => !DosExecutables.IsRuntimeHelper(e))
+            .Where(e => contentDir is null || !DosExecutables.IsHostLauncherBatch(contentDir, e))
+            .ToList();
+        var games = usable
+            .Where(e => !DosExecutables.IsSetupLike(e) || DosExecutables.TitleMatchStrength(e, title) == 3)
+            .ToList();
+        var real = games.Where(g => !DosExecutables.IsLikelyUtility(g)).ToList();
+        var installers = usable.Count - games.Count;
+        return real.Count > 0 || (games.Count > 0 && installers == 0)
+            ? RankGames(games, real, title, executables, SizeOf)
+            : [];
+    }
+
+    private static List<string> RankGames(List<string> games, List<string> real, string title,
+                                          IReadOnlyList<string> all, Func<string, long> sizeOf)
+    {
+        var ranked = new List<string>();
+        void Add(IEnumerable<string> paths)
+        {
+            foreach (var p in paths)
+                if (!ranked.Contains(p, StringComparer.OrdinalIgnoreCase))
+                    ranked.Add(p);
+        }
+
+        Add(games
             .Select(g => (Path: g, Strength: DosExecutables.TitleMatchStrength(g, title)))
             .Where(x => x.Strength > 0)
             .OrderByDescending(x => x.Strength)
@@ -70,14 +107,9 @@ public static class ExecutableGuesser
             .ThenByDescending(x => IsBatch(x.Path))
             .ThenByDescending(x => sizeOf(x.Path))
             .ThenBy(x => x.Path, StringComparer.OrdinalIgnoreCase)
-            .Select(x => x.Path)
-            .FirstOrDefault();
-        if (titled is not null)
-            return titled;
+            .Select(x => x.Path));
 
-        var known = Shallowest(games.Where(DosExecutables.IsKnownLauncher));
-        if (known is not null)
-            return known;
+        Add(games.Where(DosExecutables.IsKnownLauncher).OrderBy(Depth).ThenBy(g => g, StringComparer.OrdinalIgnoreCase));
 
         var programs = WithoutGraphicsVariants(real.Where(g => !IsBatch(g)).ToList())
             .OrderByDescending(sizeOf)
@@ -90,11 +122,12 @@ public static class ExecutableGuesser
         if (all.Any(DosExecutables.IsExtender)
             && programs.FirstOrDefault() is { } main
             && Shallowest(real.Where(g => IsBatch(g) && Depth(g) <= Depth(main) && SharesPrefix(Stem(g), Stem(main)))) is { } launcher)
-            return launcher;
+            Add([launcher]);
 
-        return programs.FirstOrDefault()
-            ?? Shallowest(real)
-            ?? games.OrderByDescending(sizeOf).ThenBy(Depth).ThenBy(g => g, StringComparer.OrdinalIgnoreCase).First();
+        Add(programs);
+        Add(real.OrderBy(Depth).ThenBy(g => g, StringComparer.OrdinalIgnoreCase));
+        Add(games.OrderByDescending(sizeOf).ThenBy(Depth).ThenBy(g => g, StringComparer.OrdinalIgnoreCase));
+        return ranked;
     }
 
     private static string PickInstaller(List<string> installers) =>

@@ -669,8 +669,9 @@ public partial class MainWindow : Window
         return found;
     }
 
-    /// <summary>The program a finished install left behind, when it is still in the content.</summary>
-    private static string? InstalledProgram(string contentDir, string? installed) =>
+    /// <summary>The program EmuDOS learned for the game (after an install, or by a trial boot at
+    /// import), when it is still in the content.</summary>
+    private static string? LearnedProgram(string contentDir, string? installed) =>
         installed is not null && File.Exists(Path.Combine(contentDir, installed.Replace('\\', '/'))) ? installed : null;
 
     /// <summary>
@@ -693,7 +694,7 @@ public partial class MainWindow : Window
                 if (learned is null)
                     return null;
                 if (!learned.PinnedAutoBoot)
-                    services.Store.WriteState(gameboxPath, state with { InstalledExecutable = learned.Program });
+                    services.Store.WriteState(gameboxPath, state with { LearnedExecutable = learned.Program });
                 if (learned.Profile is { } adopted)
                     services.Store.WriteProfile(gameboxPath, adopted);
                 return learned;
@@ -926,7 +927,7 @@ public partial class MainWindow : Window
                 {
                     await services.CatalogReady;
                     return services.Resolver.LaunchExecutable(contentDir, title)
-                        ?? InstalledProgram(contentDir, state.InstalledExecutable)
+                        ?? LearnedProgram(contentDir, state.LearnedExecutable)
                         ?? BestGameExecutable(contentDir, title);
                 })
                 ?? configured;

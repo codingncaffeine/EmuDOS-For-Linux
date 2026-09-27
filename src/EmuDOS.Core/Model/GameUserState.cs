@@ -25,10 +25,11 @@ public sealed record GameUserState
     /// so it should win over auto-detection. When false, auto-detecting the game is preferred.</summary>
     public bool ExecutableIsUserChoice { get; init; }
 
-    /// <summary>The program a finished install left behind, learned after the session that ran the
-    /// installer (content-relative DOS path). Launch prefers it to guessing, below any choice the
-    /// user made and the catalog's program.</summary>
-    public string? InstalledExecutable { get; init; }
+    /// <summary>The program EmuDOS learned for this game (content-relative DOS path): the one an installer
+    /// left behind, found after the session that ran it, or the one a trial boot at import showed keeps
+    /// running when the first guess went straight back to DOS. Launch prefers it to guessing, below
+    /// any choice the user made and the catalog's program.</summary>
+    public string? LearnedExecutable { get; init; }
 
     /// <summary>The game window was fullscreen when last closed; the next launch opens it fullscreen.
     /// <see cref="WindowWidth"/>/<see cref="WindowHeight"/> keep the windowed size meanwhile.</summary>

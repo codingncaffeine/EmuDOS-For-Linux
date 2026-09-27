@@ -24,6 +24,8 @@ public static class ImportSummary
                 $"Imported {title} — {recognised}; it runs the launch script that came with it.",
             (ImportClassification.ReadyToPlay, LaunchSource.AutoBoot) =>
                 $"Imported {title} — {recognised}; it runs its installed program {program}.",
+            (ImportClassification.ReadyToPlay, _) when program is not null && result.TrialRejected.Count > 0 =>
+                $"Imported {title} — {recognised}; {string.Join(", ", result.TrialRejected.Select(Leaf))} went straight back to DOS, so it runs {program} (use Choose program… if that's wrong).",
             (ImportClassification.ReadyToPlay, _) when program is not null =>
                 $"Imported {title} — {recognised}; guessed {program} (use Choose program… if that's wrong).",
             (ImportClassification.NeedsInstall, _) when program is not null =>
