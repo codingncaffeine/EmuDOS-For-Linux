@@ -218,7 +218,7 @@
         <StackPanel Margin="22,18">
           <TextBlock Text="Downloads" Theme="{StaticResource Heading}" Margin="0,0,0,4"/>
           <TextBlock Theme="{StaticResource Muted}" Margin="0,0,0,14"
-                     Text="Components are fetched on demand rather than bundled (for size and licensing). The core is required; the catalog is optional."/>
+                     Text="Components are fetched on demand rather than bundled (for size and licensing). The core is required. The game catalog is built in and updates itself from each release."/>
           <ItemsControl Name="DownloadList">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:DownloadRow">

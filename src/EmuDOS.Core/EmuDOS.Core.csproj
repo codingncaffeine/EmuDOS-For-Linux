@@ -13,4 +13,10 @@
     <PackageReference Include="SharpCompress" Version="0.49.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The curated catalog baseline (hashed names only; built from a local source list with
+         the EmuDOS build-catalog command). Installed on first run; a newer release asset replaces it. -->
+    <EmbeddedResource Include="Catalog\catalog.db" LogicalName="EmuDOS.Catalog.baseline.db" />
+  </ItemGroup>
+
 </Project>

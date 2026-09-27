@@ -8,18 +8,17 @@ public class CatalogSeederTests
     public void Seeds_catalog_from_an_exodos_style_tree()
     {
         var dosRoot = TempDir();
-        MakeGame(dosRoot, "Doom", cycles: 20000, exe: "DOOM.EXE");
-        MakeGame(dosRoot, "Keen", cycles: 8000, exe: "KEEN.EXE");
+        MakeGame(dosRoot, "Alpha", cycles: 20000, exe: "ALPHA.EXE");
+        MakeGame(dosRoot, "Beta", cycles: 8000, exe: "BETA.EXE");
         var catalog = NewCatalog();
 
         var count = new CatalogSeeder().SeedFromExoDos(dosRoot, catalog);
 
         Assert.Equal(2, count);
-        var doom = catalog.Match(["DOOM.EXE"]);
-        Assert.NotNull(doom);
-        Assert.Equal("Doom", doom!.Title);
-        Assert.Equal(20000, doom.Cpu.FixedCycles);
-        Assert.Equal(8000, catalog.Match(["KEEN.EXE"])!.Cpu.FixedCycles);
+        var alpha = catalog.Match(["ALPHA.EXE"]);
+        Assert.NotNull(alpha);
+        Assert.Equal(20000, alpha!.Profile.Cpu.FixedCycles);
+        Assert.Equal(8000, catalog.Match(["BETA.EXE"])!.Profile.Cpu.FixedCycles);
     }
 
     [Fact]

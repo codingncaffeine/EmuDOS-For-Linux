@@ -10,6 +10,18 @@ sealed class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // Build the curated catalog from its (local, readable) source list: EmuDOS --build-catalog
+        // <source.json> <out.db>. Refuses a result in which any source name is readable.
+        if (args is ["--build-catalog", var catalogSource, var catalogOut, ..])
+        {
+            var report = EmuDOS.Core.Catalog.CatalogSource.Build(catalogSource, catalogOut);
+            Console.WriteLine($"catalog: {report.Entries} entries, revision {report.Revision} -> {catalogOut}");
+            foreach (var leak in report.Leaks)
+                Console.Error.WriteLine($"catalog: READABLE NAME in output: {leak}");
+            Environment.Exit(report.Leaks.Count == 0 ? 0 : 3);
+            return;
+        }
+
         // Headless host validation (no Avalonia/window): EmuDOS --selftest-core <core.so>.
         if (args is ["--selftest-core", var corePath, ..])
         {

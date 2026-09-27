@@ -71,6 +71,12 @@ public sealed class DownloadService(HttpClient http, AppPaths paths) : IDownload
         }
     }
 
+    /// <summary>Download <paramref name="url"/> to <paramref name="destination"/> as-is (no install step,
+    /// no checksum): for callers that validate the file themselves before using it.</summary>
+    public Task FetchAsync(string url, string destination, IProgress<DownloadProgress>? progress = null,
+                           CancellationToken cancellationToken = default) =>
+        DownloadToFileAsync(url, destination, progress, cancellationToken);
+
     private async Task DownloadToFileAsync(
         string url, string destination, IProgress<DownloadProgress>? progress, CancellationToken ct)
     {

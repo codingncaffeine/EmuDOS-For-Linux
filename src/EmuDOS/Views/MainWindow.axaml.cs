@@ -896,14 +896,23 @@ public partial class MainWindow : Window
         else
         {
             // Pick the executable. Order: an explicit Run/picker choice this launch, then a program the
-            // user deliberately picked before, then the last program run from DOS, then auto-detect
-            // (title / extender-launcher .bat / largest exe), then the configured guess.
+            // user deliberately picked before, then the last program run from DOS, then the curated
+            // catalog's program when the content has it, then auto-detect (title / extender-launcher
+            // .bat / largest exe), then the configured guess. The detection reads the whole content
+            // folder, so it runs off the UI thread.
             var state = services.Store.ReadState(tile.Game.GameboxPath);
             var configured = instance.Profile.Launch.Executable;
+            var contentDir = Path.Combine(tile.Game.GameboxPath, "content");
+            var title = tile.Title;
             var chosen = executableOverride
                 ?? (state.ExecutableIsUserChoice ? state.LastExecutable : null)
                 ?? state.LastRunProgram
-                ?? BestGameExecutable(Path.Combine(tile.Game.GameboxPath, "content"), tile.Title)
+                ?? await Task.Run(async () =>
+                {
+                    await services.CatalogReady;
+                    return services.Resolver.LaunchExecutable(contentDir, title)
+                        ?? BestGameExecutable(contentDir, title);
+                })
                 ?? configured;
 
             if (!string.Equals(chosen, configured, StringComparison.OrdinalIgnoreCase))

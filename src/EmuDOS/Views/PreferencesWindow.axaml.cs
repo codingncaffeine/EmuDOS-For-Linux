@@ -72,8 +72,28 @@ public partial class PreferencesWindow : Window
         UpdateCloudUi();
 
         var downloadRows = AssetManifest.All
+            .Where(a => a != AssetManifest.Catalog)
             .Select(a => new DownloadRow(a, _services.Downloads.IsInstalled(a)))
             .ToList();
+        // The game catalog is built in and refreshes itself from the latest release; the button checks
+        // for a newer one now. Its status line is the installed game count.
+        var catalogRow = new DownloadRow(
+            AssetManifest.Catalog.DisplayName,
+            AssetManifest.Catalog.Description,
+            installed: true,
+            customDownload: async report =>
+            {
+                report("Checking for a newer catalog…");
+                var result = await _services.CatalogUpdater.UpdateAsync();
+                if (result.Error is not null)
+                    throw new InvalidOperationException(result.Error);
+            })
+        {
+            InstalledStatus = CatalogStatusAsync,
+            InstalledAction = "Check for update",
+        };
+        downloadRows.Insert(Math.Min(1, downloadRows.Count), catalogRow);
+        _ = catalogRow.RefreshInstalledStatusAsync();
         // CRT shaders: the libretro slang preset pack. The librashader GL engine is bundled with
         // EmuDOS (next to the binary), so this only downloads the presets; F3 in-game cycles them.
         var paths = _services.Paths;
@@ -176,19 +196,38 @@ public partial class PreferencesWindow : Window
         Set(GameOptionsStatus, "Saved — applies next launch.", Success);
     }
 
-    private void OnResetGameOptions(object? sender, RoutedEventArgs e)
+    private async void OnResetGameOptions(object? sender, RoutedEventArgs e)
     {
         if (_game is null || _profile is null)
             return;
 
-        var contentDir = _services.Store.Resolve(_game.Game.GameboxPath).ContentPath;
-        var names = Directory.Exists(contentDir)
-            ? Directory.EnumerateFiles(contentDir).Select(Path.GetFileName).OfType<string>()
-            : Enumerable.Empty<string>();
-
-        var baseline = _profile with { Origin = ProfileOrigin.Default };
-        var resolved = _services.Resolver.Resolve(baseline, names);
-        _services.Store.WriteProfile(_game.Game.GameboxPath, resolved);
+        // The options this tab edits go back to their defaults, then the catalog's settings apply when
+        // it knows the game. Reads the whole content folder, so off the UI thread.
+        var gameboxPath = _game.Game.GameboxPath;
+        var current = _profile;
+        var resolved = await Task.Run(() =>
+        {
+            var contentDir = _services.Store.Resolve(gameboxPath).ContentPath;
+            var paths = Directory.Exists(contentDir)
+                ? Directory.EnumerateFiles(contentDir, "*", SearchOption.AllDirectories)
+                    .Select(f => Path.GetRelativePath(contentDir, f).Replace('/', '\\'))
+                    .ToList()
+                : [];
+            var defaults = new GameProfile();
+            var reset = current with
+            {
+                Cpu = current.Cpu with { CyclesMode = defaults.Cpu.CyclesMode, FixedCycles = defaults.Cpu.FixedCycles },
+                Machine = current.Machine with { Machine = defaults.Machine.Machine, AspectCorrection = defaults.Machine.AspectCorrection },
+                Memory = current.Memory with { SizeMb = defaults.Memory.SizeMb },
+                Sound = current.Sound with { SoundBlaster = defaults.Sound.SoundBlaster, Midi = defaults.Sound.Midi },
+                Display = defaults.Display,
+                Origin = ProfileOrigin.Default,
+            };
+            return _services.Resolver.Resolve(reset, paths).Profile;
+        });
+        _services.Store.WriteProfile(gameboxPath, resolved);
+        if (_game?.Game.GameboxPath != gameboxPath)
+            return; // another game was picked meanwhile; its options are on screen now
         _profile = resolved;
 
         PopulateGameOptions();
@@ -325,6 +364,15 @@ public partial class PreferencesWindow : Window
     }
 
     // ── Downloads ─────────────────────────────────────────────────────────────────
+    private async Task<string> CatalogStatusAsync()
+    {
+        await _services.CatalogReady;
+        var (count, revision) = await Task.Run(() => (_services.Catalog.Count, _services.Catalog.Revision));
+        return count == 0
+            ? "No games yet."
+            : $"Recognises {count} games (catalog revision {revision}).";
+    }
+
     private async void OnDownloadClick(object? sender, RoutedEventArgs e)
     {
         if ((sender as Control)?.DataContext is not DownloadRow row)
@@ -333,7 +381,12 @@ public partial class PreferencesWindow : Window
         row.IsBusy = true;
         if (row.CustomDownload is { } custom)
         {
-            try { await custom(msg => row.SetProgress(msg)); row.SetResult(true, null); }
+            try
+            {
+                await custom(msg => row.SetProgress(msg));
+                row.SetResult(true, null);
+                await row.RefreshInstalledStatusAsync();
+            }
             catch (Exception ex) { row.SetResult(false, ex.Message); }
             row.IsBusy = false;
             return;

@@ -12,6 +12,25 @@ public partial class App : Application
 {
     public AppServices Services { get; private set; } = null!;
 
+    private async Task RefreshCatalogAsync()
+    {
+        try
+        {
+            await Services.CatalogReady;
+            var result = await Services.CatalogUpdater.UpdateAsync();
+            if (result.Installed)
+                Services.SystemLog.Info($"Catalog: updated to revision {result.Revision} ({result.Entries} games).");
+            else if (result.Error is not null)
+                Services.SystemLog.Info($"Catalog: update check failed: {result.Error}");
+            else
+                Services.SystemLog.Info($"Catalog: up to date (revision {result.Revision}, {result.Entries} games).");
+        }
+        catch (Exception ex)
+        {
+            Services.SystemLog.Error($"Catalog: update failed: {ex.Message}");
+        }
+    }
+
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
     public override async void OnFrameworkInitializationCompleted()
@@ -33,6 +52,11 @@ public partial class App : Application
         window.Show();
 
         base.OnFrameworkInitializationCompleted();
+
+        // Refresh the curated catalog from the latest release (best-effort, off the UI thread). Same
+        // consent as the update check: both only contact GitHub when it is enabled.
+        if (Services.Settings.CheckForUpdates)
+            _ = Task.Run(RefreshCatalogAsync);
 
         // Dev/smoke hook (env-gated): import a game on startup.
         var autoImport = Environment.GetEnvironmentVariable("EMUDOS_AUTOIMPORT");

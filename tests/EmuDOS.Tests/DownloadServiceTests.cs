@@ -127,12 +127,13 @@ public class DownloadServiceTests
 
         return ms.ToArray();
     }
+}
 
-    private sealed class FakeHttpMessageHandler(byte[] payload, HttpStatusCode status = HttpStatusCode.OK)
-        : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request, CancellationToken cancellationToken) =>
-            Task.FromResult(new HttpResponseMessage(status) { Content = new ByteArrayContent(payload) });
-    }
+/// <summary>Answers every request with one canned payload and status.</summary>
+internal sealed class FakeHttpMessageHandler(byte[] payload, HttpStatusCode status = HttpStatusCode.OK)
+    : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request, CancellationToken cancellationToken) =>
+        Task.FromResult(new HttpResponseMessage(status) { Content = new ByteArrayContent(payload) });
 }

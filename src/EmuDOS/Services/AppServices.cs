@@ -30,12 +30,24 @@ public sealed class AppServices
         Resolver = new ProfileResolver(Catalog);
         Import = new ImportPipeline(Paths, Store, Resolver);
         Downloads = new DownloadService(new HttpClient(), Paths);
+        CatalogUpdater = new CatalogUpdater(Catalog, Downloads);
 
         _screenScraperHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
         _screenScraperHttp.DefaultRequestHeaders.Add("User-Agent", "EmuDOS/1.0");
         SnapsLog = new AppLog(Paths, "snaps.log");
         SystemLog = new AppLog(Paths, "system.log");
         CloudLog = new AppLog(Paths, "cloud-sync.log");
+
+        // The embedded catalog baseline goes in before anything reads the catalog; imports await this.
+        CatalogReady = Task.Run(() =>
+        {
+            try
+            {
+                if (CatalogUpdater.EnsureBaseline())
+                    SystemLog.Info($"Catalog: installed the built-in catalog (revision {Catalog.Revision}, {Catalog.Count} games).");
+            }
+            catch (Exception ex) { SystemLog.Error($"Catalog: built-in catalog install failed: {ex.Message}"); }
+        });
         Art = BuildArtService();
     }
 
@@ -66,6 +78,13 @@ public sealed class AppServices
     public ImportPipeline Import { get; }
 
     public DownloadService Downloads { get; }
+
+    /// <summary>Installs the embedded catalog baseline and fetches newer catalogs.</summary>
+    public CatalogUpdater CatalogUpdater { get; }
+
+    /// <summary>Completes once the embedded catalog baseline is installed (or found older than the
+    /// installed one). Await it before matching games against the catalog.</summary>
+    public Task CatalogReady { get; }
 
     public ArtService Art { get; private set; }
 

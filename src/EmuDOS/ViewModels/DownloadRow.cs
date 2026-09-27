@@ -20,6 +20,13 @@ public sealed partial class DownloadRow : ObservableObject
     /// <summary>A non-standard download (e.g. the slang shader pack), reporting progress as text.</summary>
     public Func<Action<string>, Task>? CustomDownload { get; }
 
+    /// <summary>Computes the "installed" status line (e.g. the catalog's game count) off the UI thread;
+    /// null keeps the plain "Installed.".</summary>
+    public Func<Task<string>>? InstalledStatus { get; init; }
+
+    /// <summary>The button caption once installed (default "Re-download").</summary>
+    public string InstalledAction { get; init; } = "Re-download";
+
     [ObservableProperty] private bool _isInstalled;
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _status = "";
@@ -46,7 +53,7 @@ public sealed partial class DownloadRow : ObservableObject
     }
 
     // ActionText / CanDownload depend on IsBusy + IsInstalled, so re-raise them when either changes.
-    public string ActionText => IsBusy ? "Working…" : IsInstalled ? "Re-download" : "Download";
+    public string ActionText => IsBusy ? "Working…" : IsInstalled ? InstalledAction : "Download";
     public bool CanDownload => !IsBusy;
 
     partial void OnIsBusyChanged(bool value)
@@ -68,5 +75,22 @@ public sealed partial class DownloadRow : ObservableObject
         IsInstalled = ok || IsInstalled;
         Status = ok ? "Installed." : $"Failed: {error}";
         StatusBrush = ok ? Success : Failure;
+    }
+
+    /// <summary>Replace "Installed." with <see cref="InstalledStatus"/> when the row has one.</summary>
+    public async Task RefreshInstalledStatusAsync()
+    {
+        if (InstalledStatus is null || !IsInstalled)
+            return;
+        try
+        {
+            Status = await InstalledStatus();
+            StatusBrush = Success;
+        }
+        catch (Exception ex)
+        {
+            Status = $"Unavailable: {ex.Message}";
+            StatusBrush = Failure;
+        }
     }
 }

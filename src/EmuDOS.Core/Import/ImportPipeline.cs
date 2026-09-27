@@ -65,6 +65,8 @@ public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileRe
             string? chosen;
             GameProfile profile;
             string? warning = null;
+            var launchSource = LaunchSource.None;
+            var recognized = false;
 
             if (discMount is not null)
             {
@@ -106,6 +108,7 @@ public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileRe
                 {
                     classification = ImportClassification.ReadyToPlay;
                     chosen = autoStart;
+                    launchSource = LaunchSource.AutoBoot;
                     profile = new GameProfile { Title = title, SourceMedia = media, Launch = new LaunchSpec { Executable = chosen } };
                 }
                 // A zip/folder that is essentially just a CD image (a disc image present, with no
@@ -127,6 +130,8 @@ public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileRe
                     // assume a fixed install path which breaks once imported into a subfolder).
                     if (chosen is not null)
                         chosen = DosExecutables.ResolveBatRedirect(box.ContentDir, chosen);
+                    if (chosen is not null)
+                        launchSource = LaunchSource.Guess;
                     profile = new GameProfile
                     {
                         Title = title,
@@ -136,13 +141,22 @@ public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileRe
                 }
             }
 
-            // Enrich with curated config if the catalog recognizes the content (not for raw discs).
+            // Enrich with curated config if the catalog recognizes the content (not for raw discs): its
+            // settings apply, and its program replaces the guessed one when the content has it.
             if (resolver is not null && discMount is null)
             {
-                var contentFiles = Directory.EnumerateFiles(box.ContentDir, "*", SearchOption.AllDirectories)
-                    .Select(Path.GetFileName)
-                    .Where(n => !string.IsNullOrEmpty(n))!;
-                profile = resolver.Resolve(profile, contentFiles!);
+                var contentPaths = Directory.EnumerateFiles(box.ContentDir, "*", SearchOption.AllDirectories)
+                    .Select(f => Path.GetRelativePath(box.ContentDir, f).Replace('/', '\\'))
+                    .ToList();
+                var resolution = resolver.Resolve(profile, contentPaths);
+                profile = resolution.Profile;
+                recognized = resolution.Recognized;
+                if (resolution.Executable is not null)
+                {
+                    chosen = resolution.Executable;
+                    classification = ImportClassification.ReadyToPlay;
+                    launchSource = LaunchSource.Catalog;
+                }
             }
 
             // eXoDOS games ship a DOSBOX.BAT that is the authoritative launch recipe (mount the disc,
@@ -153,6 +167,7 @@ public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileRe
             {
                 profile = profile with { Launch = exoLaunch };
                 chosen = null;
+                launchSource = LaunchSource.PackageScript;
             }
 
             // A folder/zip game with its own files PLUS a bundled CD image (e.g. a cd\*.cue) needs
@@ -174,6 +189,9 @@ public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileRe
                 Executables = executables,
                 ChosenExecutable = chosen,
                 Warning = warning,
+                Title = profile.Title,
+                CatalogRecognized = recognized,
+                LaunchSource = launchSource,
             };
         }
         catch (Exception ex)
@@ -335,7 +353,8 @@ public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileRe
         }
     }
 
-    private static string DeriveTitle(string sourcePath)
+    /// <summary>The title an import gets from the dropped folder or archive name.</summary>
+    public static string DeriveTitle(string sourcePath)
     {
         var name = Directory.Exists(sourcePath)
             ? new DirectoryInfo(sourcePath).Name
@@ -529,6 +548,11 @@ public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileRe
         }
         return destName;
     }
+
+    /// <summary>The executable heuristics alone: classify <paramref name="executables"/> (content-relative
+    /// DOS paths) and pick the program to run, as import does before the catalog is consulted.</summary>
+    public static (ImportClassification Classification, string? Executable) GuessExecutable(
+        IReadOnlyList<string> executables, string title) => Classify([.. executables], title);
 
     private static (ImportClassification, string?) Classify(List<string> executables, string title)
     {

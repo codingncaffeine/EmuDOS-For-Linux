@@ -362,6 +362,7 @@ public sealed partial class MainViewModel : ObservableObject
     public async Task ImportPathsAsync(IEnumerable<string> paths)
     {
         var all = paths.ToList();
+        await _services.CatalogReady; // the built-in catalog is installed before the first match
         var discFiles = all.Where(p => File.Exists(p) && Core.Import.ImportPipeline.IsDiscFile(p)).ToHashSet();
         var singles = all.Where(p => !discFiles.Contains(p)).ToList();
         var discSets = new List<IReadOnlyList<string>>();
