@@ -82,7 +82,7 @@ controllers), so no separate .NET or SDL install is needed.
    - `emudos_<ver>_amd64.deb` — system install (`emudos` on PATH, desktop entry).
    - `EmuDOS-<ver>-linux-x64.tar.gz` — self-contained; extract anywhere writable and run `./EmuDOS`.
    - Arch users: `emudos-bin` on the AUR.
-2. The **DOSBox Pure core** downloads by itself the first time you start a game (fetched on demand
+2. The **DOSBox Pure core** downloads by itself the first time you add or start a game (fetched on demand
    from the Linux libretro build servers, not bundled; also under **Preferences → Downloads**).
 3. Drag a game folder, `.zip`, or disc image onto the window to add it, or a folder full of games
    to add them all.

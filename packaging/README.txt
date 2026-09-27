@@ -5,7 +5,7 @@ A Boxer-style frontend for your classic DOS games, built on the DOSBox Pure
 libretro core. This is the self-contained Linux build — the .NET runtime, SDL3
 (game audio and gamepads) and the CRT shader engine are bundled, so there is
 nothing else to install to launch it. The DOSBox Pure core downloads by itself
-the first time you start a game.
+the first time you add or start a game.
 
 Running
 -------

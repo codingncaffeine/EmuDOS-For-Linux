@@ -23,7 +23,7 @@ Everything you can do in EmuDOS, and how.
 
 ## First run
 
-EmuDOS downloads the DOS emulator core (*DOSBox Pure*) the first time you start a game. To get it ahead of time, open **Preferences** (right-click the shelf or the title area → **Preferences**) → **Downloads** and click **Download** next to *DOSBox Pure core*. The *Game catalog* is built in and updates itself from each new release: it recognises popular games, starts the right program and applies good settings.
+EmuDOS downloads the DOS emulator core (*DOSBox Pure*) the first time you add or start a game. To get it ahead of time, open **Preferences** (right-click the shelf or the title area → **Preferences**) → **Downloads** and click **Download** next to *DOSBox Pure core*. The *Game catalog* is built in and updates itself from each new release: it recognises popular games, starts the right program and applies good settings.
 
 ---
 

@@ -370,6 +370,15 @@ public sealed partial class MainViewModel : ObservableObject
     public async Task ImportPathsAsync(IEnumerable<string> paths)
     {
         await _services.CatalogReady; // the built-in catalog is installed before the first match
+        // The core is also what trial boots run on: fetch it now, as the first launch would, so the very
+        // first imports get them. A failed download only means this import guesses without trying.
+        if (!_services.Downloads.IsInstalled(Core.Downloads.AssetManifest.DosBoxPure))
+        {
+            Report("Downloading DOSBox Pure core…", busy: true);
+            var core = await Task.Run(() => _services.Downloads.DownloadAsync(Core.Downloads.AssetManifest.DosBoxPure));
+            if (!core.Success)
+                _services.SystemLog.Info($"Core download before import failed: {core.Error}");
+        }
         // A dropped folder of games imports game by game; a cue's .bin tracks go in with the cue.
         var dropped = paths.ToList();
         var all = await Task.Run(() => Core.Import.CollectionScanner.Expand(dropped));
