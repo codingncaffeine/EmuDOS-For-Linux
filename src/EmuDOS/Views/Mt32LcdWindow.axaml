@@ -4,7 +4,7 @@
         x:Class="EmuDOS.Views.Mt32LcdWindow"
         Title="MT-32" WindowDecorations="None" TransparencyLevelHint="Transparent"
         Background="Transparent" CanResize="False" SizeToContent="WidthAndHeight"
-        ShowInTaskbar="False" Topmost="True"
+        ShowInTaskbar="False" Topmost="True" ShowActivated="False"
         PointerPressed="OnDrag" PointerWheelChanged="OnScaleWheel">
   <!-- The Roland MT-32 photo at native size in a Viewbox (scroll-wheel resizes it, aspect locked);
        our dot-matrix LCD is overlaid on the glass area. -->

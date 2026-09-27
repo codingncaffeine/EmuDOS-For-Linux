@@ -85,7 +85,7 @@ Save states capture the whole machine, so they're best for plain DOS games; a bo
 
 For games that use the mouse to look/turn:
 
-- **Middle-click** locks the mouse: the cursor hides and is held to the window, so you can turn continuously without the pointer escaping. **Middle-click again** (or **Alt-Tab**) to release it. (You can also bind a key for this under **Preferences → Hotkeys**.) Locked motion uses raw mouse input, so it stays accurate and even in every direction.
+- The mouse **locks automatically** when a game opens, the moment you move the mouse in the game window: the cursor hides and is held to the window, so you can turn continuously without the pointer escaping. **Middle-click** to release it; **click into the game** to lock it again (that click isn't passed to the game). **Alt-Tab** releases it too, and coming back to the game locks it again. (You can also bind a toggle key under **Preferences → Hotkeys**.) Locked motion uses raw mouse input, so it stays accurate and even in every direction.
 - **Scroll wheel** raises/lowers mouse sensitivity on the fly (a small readout appears at the top). DOS games don't use the wheel, so there's no conflict.
 
 ---
@@ -101,7 +101,7 @@ Under **Preferences → Media** you can set the save folders, the screenshot siz
 
 ## Hotkeys
 
-**Preferences → Hotkeys** rebinds the screenshot, record, mouse-lock, disc-swap menu (**F10**), and quick save/load state (**F5**/**F8**) keys — click a box and press the key you want (Esc resets it to the default). Middle-click always toggles mouse lock regardless.
+**Preferences → Hotkeys** rebinds the screenshot, record, mouse-lock, disc-swap menu (**F10**), and quick save/load state (**F5**/**F8**) keys — click a box and press the key you want (Esc resets it to the default). Middle-click always releases the mouse lock regardless, and clicking into the game always locks it again.
 
 ---
 

@@ -29,10 +29,21 @@ namespace EmuDOS.Platform;
 /// </summary>
 internal sealed unsafe class X11MouseLock : IDisposable
 {
+    /// <summary>What a Lock/Unlock request came to (reported on the input thread).</summary>
+    public enum LockState
+    {
+        /// <summary>Grab + raw motion engaged; the game owns the mouse.</summary>
+        Engaged,
+        /// <summary>The lock ended (Unlock, or shutdown).</summary>
+        Released,
+        /// <summary>The grab could not be taken (no X11, XI too old, or another client holds the pointer).</summary>
+        Refused,
+    }
+
     // ── Callbacks (all invoked on the input thread) ──────────────────────────────────────────────
     private readonly Action<double, double> _onRawDelta;   // unaccelerated device counts since the last event
     private readonly Action<int, bool> _onButton;          // X button number (1 left, 2 middle, 3 right, 4/5 wheel), pressed
-    private readonly Action<bool> _onActiveChanged;        // true when the lock engaged, false when it ended (or failed)
+    private readonly Action<LockState> _onStateChanged;
     private readonly Action<string> _log;
 
     private readonly ConcurrentQueue<(Command Kind, IntPtr Window)> _commands = new();
@@ -45,11 +56,11 @@ internal sealed unsafe class X11MouseLock : IDisposable
     /// <summary>True while the grab + raw-motion lock is engaged (set by the input thread).</summary>
     public bool IsActive => _active;
 
-    public X11MouseLock(Action<double, double> onRawDelta, Action<int, bool> onButton, Action<bool> onActiveChanged, Action<string> log)
+    public X11MouseLock(Action<double, double> onRawDelta, Action<int, bool> onButton, Action<LockState> onStateChanged, Action<string> log)
     {
         _onRawDelta = onRawDelta;
         _onButton = onButton;
-        _onActiveChanged = onActiveChanged;
+        _onStateChanged = onStateChanged;
         _log = log;
 
         int* fds = stackalloc int[2];
@@ -62,7 +73,13 @@ internal sealed unsafe class X11MouseLock : IDisposable
         _thread.Start();
     }
 
-    /// <summary>Engage the lock on <paramref name="window"/> (an X window id). Reported back via onActiveChanged.</summary>
+    /// <summary>
+    /// Engage the lock on <paramref name="window"/> (an X window id). Reported back via onStateChanged.
+    /// Call it only while the pointer is in the window: a compositor honours a pointer lock solely for
+    /// the surface the pointer is in, and under Xwayland an early request (before the compositor has
+    /// moved its pointer focus to a freshly mapped window) grabs on the X side only, leaving the real
+    /// pointer free to wander off — so the owner waits for the toolkit's enter/move event before asking.
+    /// </summary>
     public void Lock(IntPtr window) => Post(Command.Lock, window);
 
     /// <summary>Release the lock: ungrab, show the cursor, park the pointer at the window centre.</summary>
@@ -94,15 +111,15 @@ internal sealed unsafe class X11MouseLock : IDisposable
     {
         if (!Open())
         {
-            // No usable X11: drain commands forever, answering every Lock with "not active" so the
-            // window falls back to bounded toolkit deltas.
+            // No usable X11: drain commands forever, refusing every lock so the window falls back to
+            // bounded toolkit deltas.
             while (true)
             {
                 WaitForWake(-1);
                 while (_commands.TryDequeue(out var c))
                 {
                     if (c.Kind == Command.Quit) return;
-                    if (c.Kind == Command.Lock) _onActiveChanged(false);
+                    if (c.Kind == Command.Lock) _onStateChanged(LockState.Refused);
                 }
             }
         }
@@ -139,7 +156,7 @@ internal sealed unsafe class X11MouseLock : IDisposable
         {
             _log($"mouse lock thread ended: {ex.Message}");
             _active = false;
-            _onActiveChanged(false);
+            _onStateChanged(LockState.Released);
         }
         finally
         {
@@ -278,7 +295,7 @@ internal sealed unsafe class X11MouseLock : IDisposable
             XFixesShowCursor(_display, _root);
             XFlush(_display);
             _log($"mouse lock: XGrabPointer failed ({GrabName(result)}) — using bounded pointer deltas this time");
-            _onActiveChanged(false);
+            _onStateChanged(LockState.Refused);
             return;
         }
 
@@ -286,7 +303,7 @@ internal sealed unsafe class X11MouseLock : IDisposable
         WarpToCentre(window);
         XSync(_display, 0);
         _active = true;
-        _onActiveChanged(true);
+        _onStateChanged(LockState.Engaged);
     }
 
     private void DoUnlock()
@@ -299,7 +316,7 @@ internal sealed unsafe class X11MouseLock : IDisposable
         XFixesShowCursor(_display, _root);
         XSync(_display, 0);
         _lockedWindow = IntPtr.Zero;
-        _onActiveChanged(false);
+        _onStateChanged(LockState.Released);
     }
 
     private void WarpToCentre(IntPtr window)

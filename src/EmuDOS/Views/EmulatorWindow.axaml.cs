@@ -67,7 +67,12 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
     private double _sensitivity = MouseSensitivity;
     private bool _mouseLeft, _mouseRight;
     private bool _mouseLocked;
-    private X11MouseLock? _x11Lock; // created on first lock; null = no X11 (bounded deltas only)
+    private readonly X11MouseLock _x11Lock;
+    // Auto-lock: armed at launch and again whenever the window loses activation, so the mouse locks
+    // on the first mouse movement inside the (active) game window. A deliberate middle-click release
+    // disarms it; from then on a click into the game (or the hotkey) locks it again.
+    private bool _autoLockArmed = true;
+    private bool _autoLockPending; // a Lock request is in flight on the input thread
     private Point? _lastPointer;
     private bool _capsLock;
     private volatile bool _menuHeld; // mapped to the gamepad L3 button, which opens dosbox's disc menu
@@ -125,8 +130,10 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
         {
             _session?.SetSpeed(1.0);
             _session?.SetRewinding(false);
-            if (_mouseLocked) ToggleMouseLock();
+            if (_mouseLocked) SetMouseLock(false);
+            _autoLockArmed = true; // coming back to the game locks the mouse again
         };
+        _x11Lock = new X11MouseLock(OnRawDelta, OnGrabbedButton, OnLockStateChanged, _log.Info);
 
         _session = engine.CreateSession(instance, this);
         if (initialState is not null)
@@ -525,30 +532,62 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
 
         // Locked with the X11 grab engaged: the game is fed raw device motion on the input thread
         // (OnRawDelta) and the pointer never reaches us — ignore anything the toolkit reports.
-        if (_mouseLocked && _x11Lock?.IsActive == true)
+        if (_mouseLocked && _x11Lock.IsActive)
             return;
 
+        // Auto-lock on genuine movement inside the window: a position CHANGE. The first pointer event
+        // after a window maps can be a stale "enter" the X server synthesizes from its own idea of the
+        // pointer (under Xwayland that is not where the real pointer is), so one event proves nothing;
+        // a second one at a different position is the real mouse moving over this window.
+        if (!_mouseLocked && _lastPointer is { } prev && prev != p)
+            TryAutoLock();
+
         // Unlocked, or locked without an X11 grab (no X11 at all, or the grab was refused): bounded
-        // window-relative deltas.
+        // window-relative deltas. A single event that spans more than half the window is not mouse
+        // motion but a jump — the X server's stale post-map pointer position giving way to the real
+        // one (Xwayland), or a warp — and would fling the game's cursor across the screen.
         if (_lastPointer is { } last)
         {
-            lock (_inputLock)
+            double dx = p.X - last.X, dy = p.Y - last.Y;
+            if (Math.Abs(dx) <= Math.Max(200, Bounds.Width / 2) && Math.Abs(dy) <= Math.Max(200, Bounds.Height / 2))
             {
-                _mouseAccumX += (p.X - last.X) * _sensitivity;
-                _mouseAccumY += (p.Y - last.Y) * _sensitivity;
+                lock (_inputLock)
+                {
+                    _mouseAccumX += dx * _sensitivity;
+                    _mouseAccumY += dy * _sensitivity;
+                }
             }
         }
         _lastPointer = p;
     }
 
-    protected override void OnPointerExited(PointerEventArgs e) => _lastPointer = null;
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+        _lastPointer = null;
+    }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
-        // Middle button is the host mouse-lock toggle (not forwarded to the game).
-        if (e.GetCurrentPoint(this).Properties.IsMiddleButtonPressed)
+        var props = e.GetCurrentPoint(this).Properties;
+        // Middle button releases the lock (never forwarded to the game). While locked, presses arrive on
+        // the input thread instead (OnGrabbedButton), so this path only sees the unlocked state.
+        if (props.IsMiddleButtonPressed)
         {
-            ToggleMouseLock();
+            if (_mouseLocked)
+            {
+                SetMouseLock(false);
+                _autoLockArmed = false; // a deliberate release stays released until the user clicks back in
+            }
+            e.Handled = true;
+            return;
+        }
+        // Any other click into an unlocked game locks the mouse again; the capture click itself is
+        // swallowed, as DOSBox does, so the game never sees a stray button press.
+        if (!_mouseLocked)
+        {
+            Focus();
+            SetMouseLock(true);
             e.Handled = true;
             return;
         }
@@ -587,14 +626,18 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
     // XInput2 motion feeds the game, the pointer is grabbed + confined to this window, the cursor is
     // hidden. Works on Xorg and under Xwayland on every major compositor. Without X11 (or if the
     // grab is refused) the cursor is still hidden and the game gets bounded window-relative deltas.
-    private void ToggleMouseLock()
+    //
+    // Three ways in: automatically when the game window is up and the pointer is in it (TryAutoLock),
+    // a click into an unlocked game, or the hotkey. Ways out: middle-click, the hotkey, losing activation.
+    private void SetMouseLock(bool locked)
     {
-        _mouseLocked = !_mouseLocked;
-        Cursor = new Cursor(_mouseLocked ? StandardCursorType.None : StandardCursorType.Arrow);
+        if (_mouseLocked == locked)
+            return;
+        _mouseLocked = locked;
+        Cursor = new Cursor(locked ? StandardCursorType.None : StandardCursorType.Arrow);
         _lastPointer = null; // forget the pre-lock position so the next move isn't a giant jump
-        if (_mouseLocked)
+        if (locked)
         {
-            _x11Lock ??= new X11MouseLock(OnRawDelta, OnGrabbedButton, OnLockActiveChanged, _log.Info);
             if (TryGetPlatformHandle() is { HandleDescriptor: "XID" } handle)
                 _x11Lock.Lock(handle.Handle);
             else
@@ -602,9 +645,36 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
         }
         else
         {
-            _x11Lock?.Unlock();
+            _x11Lock.Unlock();
         }
-        ShowHint(_mouseLocked ? "Mouse locked — middle-click to release" : "Mouse unlocked");
+        ShowHint(locked ? "Mouse locked — middle-click to release" : "Mouse unlocked — click the game to lock again", locked ? 1.3 : 1.8);
+    }
+
+    // The hotkey toggles; a release by hotkey behaves like a middle-click release.
+    private void ToggleMouseLock()
+    {
+        bool locking = !_mouseLocked;
+        SetMouseLock(locking);
+        if (!locking)
+            _autoLockArmed = false;
+    }
+
+    // Lock without any click when armed: at launch, and again after the window regains activation, on
+    // the first real mouse movement over this window (see OnPointerMoved). A compositor honours a
+    // pointer lock only for the window its pointer is actually in, and genuine motion delivered to
+    // this window is the one proof of that which holds under Xwayland (an X query of the pointer
+    // position, or an enter event at map time, can both be stale there).
+    private void TryAutoLock()
+    {
+        if (!_autoLockArmed || _autoLockPending || _mouseLocked || !IsActive)
+            return;
+        if (TryGetPlatformHandle() is not { HandleDescriptor: "XID" } handle)
+        {
+            _autoLockArmed = false;
+            return;
+        }
+        _autoLockPending = true;
+        _x11Lock.Lock(handle.Handle);
     }
 
     // ── X11MouseLock callbacks — all on the input thread, never the UI thread ─────────────────
@@ -626,7 +696,13 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
             case 1: lock (_inputLock) _mouseLeft = pressed; break;
             case 3: lock (_inputLock) _mouseRight = pressed; break;
             case 2:
-                if (pressed) Dispatcher.UIThread.Post(() => { if (_mouseLocked) ToggleMouseLock(); });
+                if (pressed)
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        if (!_mouseLocked) return;
+                        SetMouseLock(false);
+                        _autoLockArmed = false; // a deliberate release stays released until the user clicks back in
+                    });
                 break;
             case 4 or 5:
                 if (pressed) Dispatcher.UIThread.Post(() => AdjustSensitivity(button == 4 ? 0.25 : -0.25));
@@ -634,11 +710,40 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
         }
     }
 
-    private void OnLockActiveChanged(bool active)
+    private void OnLockStateChanged(X11MouseLock.LockState state)
     {
-        _log.Info(active ? "Mouse lock engaged (X11 raw input + pointer grab)" : "Mouse lock released");
-        if (!active && _mouseLocked) // still locked from the user's point of view, but without a grab
-            Dispatcher.UIThread.Post(() => ShowHint("Mouse lock is limited on this display — middle-click to release", 2.2));
+        _log.Info(state switch
+        {
+            X11MouseLock.LockState.Engaged => "Mouse lock engaged (X11 raw input + pointer grab)",
+            X11MouseLock.LockState.Released => "Mouse lock released",
+            _ => "Mouse lock refused by the X server",
+        });
+        Dispatcher.UIThread.Post(() =>
+        {
+            _autoLockPending = false;
+            switch (state)
+            {
+                case X11MouseLock.LockState.Engaged:
+                    if (_mouseLocked)
+                        break; // a click/hotkey lock: the window state was set when it was requested
+                    if (!IsActive)
+                    {
+                        _x11Lock.Unlock(); // an auto-lock that landed after the window lost activation
+                        break;
+                    }
+                    _mouseLocked = true;
+                    Cursor = new Cursor(StandardCursorType.None);
+                    _lastPointer = null;
+                    ShowHint("Mouse locked — middle-click to release", 2.0);
+                    break;
+                case X11MouseLock.LockState.Refused:
+                    if (_mouseLocked) // requested by the user: still locked for them, but without a grab
+                        ShowHint("Mouse lock is limited on this display — middle-click to release", 2.2);
+                    else
+                        _autoLockArmed = false; // don't retry on every pointer move; a click will try again
+                    break;
+            }
+        });
     }
 
     private static ushort Modifiers(KeyModifiers m)
@@ -1008,9 +1113,9 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
     private void OnClosing(object? sender, EventArgs e)
     {
         // Release the pointer grab and show the cursor while the X window still exists.
+        _autoLockArmed = false;
         _mouseLocked = false;
-        try { _x11Lock?.Dispose(); } catch { }
-        _x11Lock = null;
+        try { _x11Lock.Dispose(); } catch { }
         _fpsTimer?.Stop();
         _hintTimer?.Stop();
         _lcdTimer?.Stop();
