@@ -303,6 +303,14 @@ public sealed partial class MainViewModel : ObservableObject
             {
                 Install(path, installed);
             }
+            else if (Directory.Exists(path) && await Task.Run(() => Core.Import.CollectionScanner.Items(path)) is not null)
+            {
+                // A folder of games: each game imports on its own (ImportPathsAsync expands it), and
+                // ROMs/SoundFonts kept beside them still install.
+                foreach (var file in await Task.Run(() => SystemFilesIn(path).ToList()))
+                    Install(file, installed);
+                toImport.Add(path);
+            }
             else if (Directory.Exists(path))
             {
                 // Look inside the folder for ROMs/SoundFonts (e.g. a dropped "MT-32 ROMs" folder).
@@ -361,10 +369,13 @@ public sealed partial class MainViewModel : ObservableObject
     /// individually.</summary>
     public async Task ImportPathsAsync(IEnumerable<string> paths)
     {
-        var all = paths.ToList();
         await _services.CatalogReady; // the built-in catalog is installed before the first match
-        var discFiles = all.Where(p => File.Exists(p) && Core.Import.ImportPipeline.IsDiscFile(p)).ToHashSet();
-        var singles = all.Where(p => !discFiles.Contains(p)).ToList();
+        // A dropped folder of games imports game by game; a cue's .bin tracks go in with the cue.
+        var dropped = paths.ToList();
+        var all = await Task.Run(() => Core.Import.CollectionScanner.Expand(dropped));
+        var isDisc = (string p) => File.Exists(p) && Core.Import.ImportPipeline.IsDiscFile(p);
+        var discFiles = Core.Import.ImportPipeline.WithoutCueTracks(all.Where(isDisc)).ToHashSet();
+        var singles = all.Where(p => !isDisc(p)).ToList();
         var discSets = new List<IReadOnlyList<string>>();
         foreach (var set in Core.Import.ImportPipeline.GroupDiscSets(discFiles))
         {
@@ -375,10 +386,13 @@ public sealed partial class MainViewModel : ObservableObject
         bool hadError = false;
         var imported = new List<Core.Import.ImportResult>();
         string? discSetHint = null;
+        var total = discSets.Count + singles.Count;
+        var index = 0;
+        string Progress(string what) => total > 1 ? $"Importing {++index} of {total}: {what}…" : $"Importing {what}…";
 
         foreach (var set in discSets)
         {
-            Report($"Importing {set.Count}-disc game…", busy: true);
+            Report(Progress($"{set.Count}-disc game"), busy: true);
             var result = await _services.Import.ImportDiscSetAsync(set);
             if (result.Success && result.GameboxPath is not null)
             {
@@ -397,7 +411,7 @@ public sealed partial class MainViewModel : ObservableObject
         foreach (var path in singles)
         {
             var name = Path.GetFileName(path.TrimEnd('\\', '/'));
-            Report($"Importing {name}…", busy: true);
+            Report(Progress(name), busy: true);
             var result = await _services.Import.ImportAsync(path);
             if (result.Success && result.GameboxPath is not null)
             {

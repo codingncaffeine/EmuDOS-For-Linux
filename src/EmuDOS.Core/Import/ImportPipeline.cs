@@ -277,7 +277,7 @@ public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileRe
         string.Concat(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
 
     private static readonly System.Text.RegularExpressions.Regex DiscMarker = new(
-        @"[\s_\-]*[\(\[]?\s*(disc|disk|cd|dvd)\s*\d+\s*[\)\]]?\s*$",
+        @"[\s_\-]*[\(\[]?\s*(disc|disk|cd|dvd)\s*\d+(\s*of\s*\d+)?\s*[\)\]]?\s*$",
         System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
 
     /// <summary>Whether a path is a disc image we know how to mount.</summary>
@@ -287,6 +287,25 @@ public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileRe
     /// <summary>A title with a trailing disc marker ("(Disc 2)", "CD1", "- Disk 3") removed.</summary>
     public static string StripDiscMarker(string name) =>
         string.IsNullOrEmpty(name) ? string.Empty : DiscMarker.Replace(name, string.Empty).Trim();
+
+    /// <summary>The disc images minus the track files a .cue among them references (a cue and its
+    /// .bin are one disc, imported through the cue).</summary>
+    public static IEnumerable<string> WithoutCueTracks(IEnumerable<string> discPaths)
+    {
+        var all = discPaths.ToList();
+        var tracks = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var cue in all.Where(p => p.EndsWith(".cue", StringComparison.OrdinalIgnoreCase)))
+        {
+            try
+            {
+                var dir = Path.GetDirectoryName(cue) ?? string.Empty;
+                foreach (var track in CueReferencedFiles(cue))
+                    tracks.Add(Path.GetFullPath(Path.Combine(dir, track)));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
+        return all.Where(p => !tracks.Contains(Path.GetFullPath(p)));
+    }
 
     /// <summary>Group disc-image paths into per-game sets by their disc-marker-stripped name, so a
     /// bundle like "Game (Disc 1).iso" + "Game (Disc 2).iso" lands as one multi-disc game.</summary>

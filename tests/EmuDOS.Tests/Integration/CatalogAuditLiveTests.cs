@@ -31,7 +31,9 @@ public class CatalogAuditLiveTests
         new CatalogUpdater(catalog, new DownloadService(new HttpClient(), new AppPaths(scratch))).EnsureBaseline();
         var resolver = new ProfileResolver(catalog);
 
-        var rows = new List<string> { "item\ttitle\tclass\theuristic\trecognized\tcatalog\tfinal" };
+        var rows = new List<string> { "item\ttitle\tclass\theuristic\trecognized\tcatalog\tfinal\tcollection" };
+        var top = CollectionScanner.Items(root);
+        rows.Add($"(library root)\t\t\t\t\t\t\t{(top is null ? "single" : $"collection of {top.Count}")}");
         foreach (var item in Directory.EnumerateFileSystemEntries(root).OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
         {
             var isDir = Directory.Exists(item);
@@ -69,7 +71,8 @@ public class CatalogAuditLiveTests
             var resolution = resolver.Resolve(new GameProfile { Title = title, Launch = new LaunchSpec { Executable = guess } }, paths);
             rows.Add(string.Join('\t', Path.GetFileName(item), title, cls, guess ?? "-",
                 resolution.Recognized ? "yes" : "no", resolution.Executable ?? "-",
-                resolution.Profile.Launch.Executable ?? "-"));
+                resolution.Profile.Launch.Executable ?? "-",
+                isDir && CollectionScanner.Items(item) is { } inner ? $"collection of {inner.Count}: {string.Join(" | ", inner.Select(Path.GetFileName))}" : "-"));
         }
 
         File.WriteAllLines(report, rows);
