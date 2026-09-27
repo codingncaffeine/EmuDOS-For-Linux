@@ -25,6 +25,11 @@ public sealed record GameUserState
     /// so it should win over auto-detection. When false, auto-detecting the game is preferred.</summary>
     public bool ExecutableIsUserChoice { get; init; }
 
+    /// <summary>The program a finished install left behind, learned after the session that ran the
+    /// installer (content-relative DOS path). Launch prefers it to guessing, below any choice the
+    /// user made and the catalog's program.</summary>
+    public string? InstalledExecutable { get; init; }
+
     /// <summary>Per-game box-art style override. <see cref="BoxStyle.Default"/> follows the global
     /// <c>UserSettings.Use3DBoxes</c> preference; the others force 2D or 3D for this game alone.</summary>
     public BoxStyle BoxStyle { get; init; } = BoxStyle.Default;

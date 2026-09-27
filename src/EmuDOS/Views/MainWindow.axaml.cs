@@ -669,6 +669,47 @@ public partial class MainWindow : Window
         return found;
     }
 
+    /// <summary>The program a finished install left behind, when it is still in the content.</summary>
+    private static string? InstalledProgram(string contentDir, string? installed) =>
+        installed is not null && File.Exists(Path.Combine(contentDir, installed.Replace('\\', '/'))) ? installed : null;
+
+    /// <summary>
+    /// After a session: when it installed the game (new programs in a folder game's content, or on a
+    /// CD game's persisted C: drive), remember the installed program so the next launch starts the
+    /// game instead of the installer. The scan runs off the UI thread.
+    /// </summary>
+    private async Task LearnFromSessionAsync(GameTile tile)
+    {
+        var services = Services;
+        var gameboxPath = tile.Game.GameboxPath;
+        try
+        {
+            var learning = await Task.Run(() =>
+            {
+                var instance = services.Store.Resolve(gameboxPath);
+                var state = services.Store.ReadState(gameboxPath);
+                var learned = Core.Import.InstallLearner.Learn(
+                    instance.ContentPath, instance.SavePath, instance.Profile, state, services.Resolver);
+                if (learned is null)
+                    return null;
+                if (!learned.PinnedAutoBoot)
+                    services.Store.WriteState(gameboxPath, state with { InstalledExecutable = learned.Program });
+                if (learned.Profile is { } adopted)
+                    services.Store.WriteProfile(gameboxPath, adopted);
+                return learned;
+            });
+            if (learning is null)
+                return;
+            var program = learning.Program[(learning.Program.LastIndexOfAny(['\\', '/']) + 1)..];
+            services.SystemLog.Info($"Learned from the install of '{tile.Title}': {learning.Program} (catalog: {learning.Recognized}).");
+            Vm?.Report($"{tile.Title} is installed — it now starts {program}.", busy: false);
+        }
+        catch (Exception ex)
+        {
+            services.SystemLog.Error($"Install learning failed for '{tile.Title}': {ex.Message}");
+        }
+    }
+
     /// <summary>The most likely game program in the content — the same guesser import uses (title,
     /// known launcher, extender batch, largest program; installers and tools skipped) — or null when
     /// the content holds no game yet (only an installer, or nothing runnable).</summary>
@@ -885,6 +926,7 @@ public partial class MainWindow : Window
                 {
                     await services.CatalogReady;
                     return services.Resolver.LaunchExecutable(contentDir, title)
+                        ?? InstalledProgram(contentDir, state.InstalledExecutable)
                         ?? BestGameExecutable(contentDir, title);
                 })
                 ?? configured;
@@ -915,7 +957,9 @@ public partial class MainWindow : Window
         var engine = new DosBoxPureEngine(
             services.Downloads.InstalledPath(AssetManifest.DosBoxPure), services.Paths.SystemDir, hw3dfx);
         services.Library.RecordPlay(tile.Id);
-        new EmulatorWindow(engine, instance, tile.Id, loadState).Show();
+        var emulator = new EmulatorWindow(engine, instance, tile.Id, loadState);
+        emulator.Closed += (_, _) => _ = LearnFromSessionAsync(tile);
+        emulator.Show();
         Vm.ClearStatus();
         }
         catch (Exception ex)
