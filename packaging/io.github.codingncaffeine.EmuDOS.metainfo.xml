@@ -64,6 +64,21 @@
   </supports>
 
   <releases>
+    <release version="0.5.5" date="2026-09-27">
+      <description>
+        <p>A built-in game catalog, smarter imports, folders of games, fullscreen, and packages that
+          work on Debian and Ubuntu LTS.</p>
+        <ul>
+          <li>Popular games are recognised on import and start the right program</li>
+          <li>The status bar says what each import found</li>
+          <li>A dropped folder of games imports each game on its own</li>
+          <li>After an installer runs, the next launch starts the installed game</li>
+          <li>Alt+Enter toggles fullscreen, remembered per game</li>
+          <li>The mouse locks as soon as it moves in the game window</li>
+          <li>SDL3 (game audio and gamepads) and the CRT shader engine ship with the app, so they load on Debian 12 and Ubuntu 22.04 and 24.04</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.5.0" date="2026-06-25">
       <description><p>First public Linux release.</p></description>
     </release>

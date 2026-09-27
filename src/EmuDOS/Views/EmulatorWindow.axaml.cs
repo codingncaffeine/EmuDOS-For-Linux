@@ -1063,9 +1063,15 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
             return;
         var r = new Effects.Librashader.ShaderRenderer();
         if (r.Initialize(paths.LibrashaderDllPath, presetPath))
+        {
             _shaderRenderer = r;
+            _log.Info($"Shader on: {_desiredPreset}");
+        }
         else
+        {
+            _log.Error($"Shader {_desiredPreset} failed: {r.LastError}");
             r.Dispose();
+        }
     }
 
     // Cycle the CRT shader live: Off -> each downloaded "crt" slang preset. Persisted per game; the

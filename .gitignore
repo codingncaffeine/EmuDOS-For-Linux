@@ -52,3 +52,12 @@ local-notes/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# SDL3 source release (downloaded + SHA-256 checked by src/native/sdl3/build.sh)
+src/native/sdl3/SDL3-*.tar.gz
+src/native/sdl3/build/
+
+# librashader source build (src/native/librashader/build.sh): toolchain, sources, output
+src/native/librashader/.cargo-home/
+src/native/librashader/.rustup-home/
+src/native/librashader/src-*/

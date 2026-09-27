@@ -64,6 +64,11 @@ smoke_one() {
              libemudos_mt32.so librashader.so; do
         [[ -f "$payload/$f" ]] && ok "$f" || fail "$f is missing"
     done
+    # SDL3 (game audio + gamepads) ships in the tarball and the .deb; the AUR package uses the system one.
+    case $artifact in
+        *.pkg.tar.*) ;;
+        *) [[ -f "$payload/libSDL3.so.0" ]] && ok "libSDL3.so.0 (bundled)" || fail "libSDL3.so.0 is missing" ;;
+    esac
 
     # --- launch ----------------------------------------------------------------
     # The check that would have caught the AUR bug. Everything above is inference; this is the only
@@ -113,6 +118,19 @@ smoke_one() {
         ok "started against the scratch profile"
     else
         fail "no data folder under the scratch profile (startup never reached AppServices)"
+    fi
+    # What the app itself logged about the parts a launch without a game never touches: SDL3 must load
+    # and its audio import resolve (no sound or gamepads otherwise), and the built-in catalog must go in.
+    local syslog=$xdg/data/EmuDOS/Logs/system.log
+    if grep -q "SDL3: loaded .*(audio import ok)" "$syslog" 2>/dev/null; then
+        ok "$(grep -o "SDL3: loaded .*" "$syslog" | head -1)"
+    else
+        fail "SDL3 did not load with a working audio import: $(grep -o "SDL3: .*" "$syslog" 2>/dev/null | head -1)"
+    fi
+    if grep -q "Catalog: installed the built-in catalog" "$syslog" 2>/dev/null; then
+        ok "$(grep -o "Catalog: installed.*" "$syslog" | head -1)"
+    else
+        fail "the built-in catalog was not installed"
     fi
     if [[ -s $xdg/data/EmuDOS/crash.log ]]; then
         fail "the app recorded exceptions in crash.log:"

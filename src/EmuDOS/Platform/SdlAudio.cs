@@ -52,6 +52,21 @@ public sealed class SdlAudio : IDisposable
         SDL_ResumeAudioStreamDevice(_stream); // streams from SDL_OpenAudioDeviceStream start paused
     }
 
+    /// <summary>Whether the SDL3 import resolves (the library loads and exports what audio calls).
+    /// Calls a harmless SDL function once; logged at startup.</summary>
+    public static bool ImportResolves()
+    {
+        try
+        {
+            _ = SDL_GetError();
+            return true;
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+        {
+            return false;
+        }
+    }
+
     public bool IsOpen => _stream != IntPtr.Zero;
 
     public string? LastError => Marshal.PtrToStringUTF8(SDL_GetError());

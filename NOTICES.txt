@@ -20,8 +20,9 @@ librashader
 -----------
 CRT / post-processing shaders are rendered through librashader by SnowflakePowered,
 which is BUNDLED with EmuDOS (librashader.so ships next to the binary) so shaders work
-out of the box. The version-pinned binary is fetched + SHA-256-verified by
-src/native/librashader/fetch.sh at build time (no committed binary).
+out of the box. Release packages build it from the tagged upstream source with
+src/native/librashader/build.sh (no committed binary); development builds fetch a
+version-pinned, SHA-256-verified binary with src/native/librashader/fetch.sh.
   Copyright (c) the librashader authors / SnowflakePowered.
   Dual-licensed under the Mozilla Public License 2.0 and the GNU General Public
   License v3.0 (both compatible with EmuDOS's GPLv3). See the full texts in
@@ -34,9 +35,32 @@ The emulation core is downloaded on demand at runtime (not bundled).
   Licensed under the GNU General Public License v2 or later.
   https://github.com/schellingb/dosbox-pure
 
-SDL3, Avalonia, LibVLCSharp and the .NET runtime
-------------------------------------------------
-SDL3 (gamepads + audio, Zlib) is the distro's libsdl3-0 package (a .deb/AUR
-dependency). Avalonia (MIT) and LibVLCSharp (LGPL-2.1) plus the .NET runtime
-(MIT) are redistributed as part of the self-contained publish bundle.
+SDL3
+----
+Game audio and gamepads go through SDL3, which is BUNDLED (libSDL3.so.0 ships next
+to the binary; the AUR package uses the system sdl3 instead). It is built from the
+pinned upstream release (SHA-256 checked) by src/native/sdl3/build.sh.
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
   https://github.com/libsdl-org/SDL
+  Licensed under the zlib license:
+
+  This software is provided 'as-is', without any express or implied
+  warranty.  In no event will the authors be held liable for any damages
+  arising from the use of this software.
+
+  Permission is granted to anyone to use this software for any purpose,
+  including commercial applications, and to alter it and redistribute it
+  freely, subject to the following restrictions:
+
+  1. The origin of this software must not be misrepresented; you must not
+     claim that you wrote the original software. If you use this software
+     in a product, an acknowledgment in the product documentation would be
+     appreciated but is not required.
+  2. Altered source versions must be plainly marked as such, and must not be
+     misrepresented as being the original software.
+  3. This notice may not be removed or altered from any source distribution.
+
+Avalonia, LibVLCSharp and the .NET runtime
+------------------------------------------
+Avalonia (MIT) and LibVLCSharp (LGPL-2.1) plus the .NET runtime (MIT) are
+redistributed as part of the self-contained publish bundle.

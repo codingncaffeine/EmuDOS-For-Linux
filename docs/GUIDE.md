@@ -23,7 +23,7 @@ Everything you can do in EmuDOS, and how.
 
 ## First run
 
-On first launch, EmuDOS needs the DOS emulator core. Open **Preferences** (right-click the shelf or the title area → **Preferences**) → **Downloads** and click **Download** next to *DOSBox Pure core*. While you're there, download the *Game catalog* too — it lets EmuDOS recognize games and apply good settings automatically.
+EmuDOS downloads the DOS emulator core (*DOSBox Pure*) the first time you start a game. To get it ahead of time, open **Preferences** (right-click the shelf or the title area → **Preferences**) → **Downloads** and click **Download** next to *DOSBox Pure core*. The *Game catalog* is built in and updates itself from each new release: it recognises popular games, starts the right program and applies good settings.
 
 ---
 
@@ -31,15 +31,16 @@ On first launch, EmuDOS needs the DOS emulator core. Open **Preferences** (right
 
 Drag a **game folder** or a **`.zip`** onto the EmuDOS window. EmuDOS will:
 
-1. Copy it into a self-contained *gamebox* and figure out which program to run (skipping DOS extenders like DOS/4GW and installers).
-2. Match it against the catalog and apply curated DOSBox settings if recognized.
-3. Download box art.
+1. Copy it into a self-contained *gamebox*, named after the folder or archive (underscores and tags like `(1994)` or `[!]` are tidied away).
+2. Match it against the catalog: a recognised game gets the catalog's program and curated DOSBox settings. Otherwise EmuDOS picks the program itself (skipping installers, setup tools and DOS extenders like DOS/4GW).
+3. Say what it found in the status bar — *recognised by the catalog; it runs …*, or *guessed …* when it picked the program itself (use **Choose program…** if that guess is wrong).
+4. Download box art.
 
-You can drop **multiple** items at once. You can also drop a **folder of MT-32 ROMs** (or the loose `.rom` files) — those get routed to the MT-32 system folder instead of being imported as a game.
+You can drop **multiple** items at once, or a **folder of games** — one subfolder, archive or disc image per game — and each is imported as its own game. (Subfolders named like parts of one game, such as `DOS`, `WIN`, `CD` or `DISK1`, keep that game in one piece.) You can also drop a **folder of MT-32 ROMs** (or the loose `.rom` files) — those get routed to the MT-32 system folder instead of being imported as a game.
 
 ### CD games (disc images)
 
-Drop a **`.iso`**, **`.cue`**/**`.bin`**, or **`.chd`** and EmuDOS imports it as a CD game, mounting the disc as a CD-ROM on launch. Run the disc's installer (`SETUP` or `INSTALL`); the game installs onto a writable **C:** drive, and from then on it launches into the installed program.
+Drop a **`.iso`**, **`.cue`**/**`.bin`**, or **`.chd`** and EmuDOS imports it as a CD game, mounting the disc as a CD-ROM on launch. Run the disc's installer (`SETUP` or `INSTALL`); the game installs onto a writable **C:** drive. When you close the window, EmuDOS picks the installed game program, and from then on the game launches straight into it. The same goes for a game imported as its installer disks: after the installer has run, the next launch starts the installed game.
 
 **Multi-disc games** — select a game's discs (e.g. `Game (Disc 1).iso` and `Game (Disc 2).iso`) and **drop them together**. EmuDOS imports them as a single game with all discs attached. To attach more discs to an existing game later, right-click → **Add disc…**.
 
@@ -103,11 +104,13 @@ Under **Preferences → Media** you can set the save folders, the screenshot siz
 
 **Preferences → Hotkeys** rebinds the screenshot, record, mouse-lock, disc-swap menu (**F10**), and quick save/load state (**F5**/**F8**) keys — click a box and press the key you want (Esc resets it to the default). Middle-click always releases the mouse lock regardless, and clicking into the game always locks it again.
 
+**Alt+Enter** switches the game window to fullscreen and back; the mouse stays locked, and each game remembers whether it was fullscreen. It is rebindable too (the box takes a key with modifiers, such as Alt+Enter).
+
 ---
 
 ## Picking the right program to run
 
-EmuDOS auto-detects the game program on launch — it prefers an executable whose name matches the game's title, then the **largest** one (the game engine dwarfs little config/registration helpers), and it skips installers and DOS extenders (DOS/4GW). For most games you just click and play.
+EmuDOS picks the game program on launch: the catalog's program when it recognises the game, then the program an installer left behind, then an executable named after the game's title, a well-known launcher name, the launcher batch of a DOS/4GW game, and finally the **largest** program (the game engine dwarfs little config/registration helpers). It skips installers, setup tools, DOS extenders (DOS/4GW) and helper tools. For most games you just click and play.
 
 When it guesses wrong, there are two ways to set it straight, and both **stick**:
 
@@ -169,7 +172,7 @@ EmuDOS recreates the Boxer experience: drop the ROMs in once and MT-32 games jus
 **Steps:**
 
 1. **Supply the ROMs.** The Roland MT-32 (or CM-32L) ROMs are Roland's copyrighted firmware — EmuDOS can't distribute them. Drag the `.rom` files, or a folder containing them, onto EmuDOS. Check **Preferences → Downloads** — the *Roland MT-32 ROMs* line shows ✓ when they're detected.
-2. **Set the game to MT-32.** In **Preferences → Game Options**, set **MIDI device** to *Roland MT-32*. (Many catalog games are already set up for it.)
+2. **Set the game to MT-32.** In **Preferences → Game Options**, set **MIDI device** to *Roland MT-32*.
 3. **Make the game output MT-32 music.** The game itself has to be configured to use Roland/MT-32 for its music. EmuDOS does this automatically for Sierra games (it points their sound config at the MT-32 driver); for others you may need to run the game's own `SETUP` (via *Open in DOS*) and choose Roland MT-32.
 
 When a game writes to the MT-32 display, the dotted amber text appears on the LCD. **Scroll the wheel** over the MT-32 window to resize it; **drag** it to reposition.
@@ -190,7 +193,7 @@ Both are remembered per game, stored in the gamebox:
 **Preferences → Downloads** manages the on-demand pieces:
 
 - **DOSBox Pure core** — required; the DOS emulator.
-- **Game catalog** — recommended; recognizes games and applies settings on import.
+- **Game catalog** — built in; shows how many games it recognises. **Check for update** fetches a newer one right away (EmuDOS also checks at startup when update checks are on).
 - **FFmpeg** — optional; only needed to record gameplay video (F9).
 - **Roland MT-32 ROMs** — *detected, not downloaded* (you supply these; see above).
 

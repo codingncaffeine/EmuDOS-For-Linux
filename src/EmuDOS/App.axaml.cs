@@ -45,6 +45,12 @@ public partial class App : Application
         UpdateService.CleanupOldFiles(); // sweep a leftover .update-staging from an interrupted self-update
         Services = new AppServices();
         Core.Audio.Mt32Synth.RegisterNativeResolver(Services.Paths.CoresDir);
+        // Game audio's [DllImport("SDL3")] resolves through the same loader as the gamepads: the bundled
+        // libSDL3.so.0 first, then the system's versioned soname (a plain import only finds libSDL3.so).
+        Core.Input.Sdl3Library.ResolveImportsFor(typeof(App).Assembly, Services.Paths.CoresDir);
+        _ = Task.Run(() => Services.SystemLog.Info(Core.Input.Sdl3Library.Load(Services.Paths.CoresDir) != IntPtr.Zero
+            ? $"SDL3: loaded {Core.Input.Sdl3Library.LoadedFrom} (audio import {(Platform.SdlAudio.ImportResolves() ? "ok" : "FAILED")})"
+            : "SDL3: not found — games will have no sound and gamepads won't work"));
 
         var viewModel = new MainViewModel(Services);
         var window = new MainWindow { DataContext = viewModel };

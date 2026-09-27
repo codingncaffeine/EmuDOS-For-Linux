@@ -38,17 +38,20 @@ downloaded at runtime — no core is bundled.
 ## Highlights
 
 - **Bookshelf library** — your games as box art on a shelf; hover a box to preview its gameplay video
-  in a retro monitor, and press <kbd>Ctrl</kbd>+<kbd>F</kbd> to search and filter. Drop a folder,
-  `.zip`, or CD image to import.
+  in a retro monitor, and press <kbd>Ctrl</kbd>+<kbd>F</kbd> to search and filter. Drop a game (a folder,
+  `.zip`, or CD image) or a whole folder of games to import them all; the status bar says what each
+  import found.
 - **2D & 3D box art** — downloaded automatically (ScreenScraper, with a SteamGridDB fallback); choose
   2D or 3D per game or library-wide, or drop in your own cover. Logos, marquees, maps and screenshots
   download from the Manage window's Extras tab.
-- **Just-works settings** — a curated catalog (seeded from [eXoDOS](https://www.retro-exo.com/exodos.html))
-  applies known-good DOSBox options on import; everything is overridable per game and survives updates.
+- **Just-works launching** — a built-in catalog of popular games recognises them on import, starts the
+  right program and applies known-good settings; it updates itself from each release. Everything is
+  overridable per game and survives updates.
 - **Discs & Windows** — multi-disc games, disc swapping, and installing/booting a full Windows 9x.
 - **Roland MT-32** — drop the ROMs in and MT-32 games use them, with an on-screen dot-matrix LCD.
-- **Save states**, **screenshots/recording**, **mouse lock**, and a **smart launcher** that picks the
-  right program.
+- **Save states**, **screenshots/recording**, **mouse lock**, **fullscreen** (<kbd>Alt</kbd>+<kbd>Enter</kbd>,
+  remembered per game), and a **smart launcher** that picks the right program and, after you run a
+  game's installer, starts the installed game.
 - **Cloud save sync** — back up your save states and notes to your own private GitHub repo, with
   optional passphrase encryption, synced automatically at launch (see [Cloud Sync](#cloud-sync)).
 - **CRT shaders** — download a CRT-focused slice of the libretro slang shader collection (CRT,
@@ -62,13 +65,14 @@ downloaded at runtime — no core is bundled.
 
 - A modern 64-bit Linux desktop (X11 or Wayland)
 - Runtime libraries (most desktops already have these; the `.deb` declares them):
-  `libsdl3-0` (audio + controllers), `libegl1`/`libgl1` + Mesa drivers (game rendering),
+  `libegl1`/`libgl1` + Mesa drivers (game rendering),
   `ffmpeg` (recording encodes), `libx11-6` + `libfontconfig1` (UI).
   Recommended: `libvlc5` + `vlc-plugin-base` + `vlc-plugin-ffmpeg` (the game-card video snaps).
 - The **DOSBox Pure** core `.so` (fetched on demand — Preferences → Downloads)
 - **Roland MT-32 / CM-32L ROMs** (optional; supply your own — see [MT-32](#mt-32-and-the-roms))
 
-The published packages bundle the .NET 10 runtime (self-contained), so no separate .NET install is needed.
+The published packages bundle the .NET 10 runtime (self-contained) and SDL3 (game audio and
+controllers), so no separate .NET or SDL install is needed.
 
 ---
 
@@ -78,9 +82,10 @@ The published packages bundle the .NET 10 runtime (self-contained), so no separa
    - `emudos_<ver>_amd64.deb` — system install (`emudos` on PATH, desktop entry).
    - `EmuDOS-<ver>-linux-x64.tar.gz` — self-contained; extract anywhere writable and run `./EmuDOS`.
    - Arch users: `emudos-bin` on the AUR.
-2. On first launch, open **Preferences → Downloads** and get the **DOSBox Pure core** (fetched on
-   demand from the Linux libretro build servers, not bundled).
-3. Drag a game folder, `.zip`, or disc image onto the window to add it.
+2. The **DOSBox Pure core** downloads by itself the first time you start a game (fetched on demand
+   from the Linux libretro build servers, not bundled; also under **Preferences → Downloads**).
+3. Drag a game folder, `.zip`, or disc image onto the window to add it, or a folder full of games
+   to add them all.
 
 The core is downloaded as `dosbox_pure_libretro.so` from
 `buildbot.libretro.com/nightly/linux/x86_64` — the same core as upstream, as `.so` instead of `.dll`.
@@ -171,7 +176,6 @@ EmuDOS stands on the work of others, with thanks. **Emulation** is the
 - **[Boxer](http://boxerapp.com/)** by Alun Bestor — the Mac DOS frontend that inspired EmuDOS, and the
   reference for the Roland MT-32 LCD.
 - **[munt / mt32emu](https://github.com/munt/munt)** — the Roland MT-32 emulation behind our synth.
-- **[eXoDOS](https://www.retro-exo.com/exodos.html)** — the DOS configuration set our catalog is seeded from.
 - **[libretro](https://www.libretro.com/)** — the core API EmuDOS hosts.
 
 **Frameworks & libraries** (the Linux port swaps several of the Windows ones):
