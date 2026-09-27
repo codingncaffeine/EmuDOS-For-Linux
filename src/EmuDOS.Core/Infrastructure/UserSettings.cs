@@ -76,6 +76,10 @@ public sealed class UserSettings
     /// <summary>In-game key that toggles the FPS overlay (current vs. locked frame rate).</summary>
     public string FpsOverlayKey { get; set; } = "F1";
 
+    /// <summary>Key gesture that switches the game window between a window and borderless fullscreen
+    /// (a modifier chord such as "Alt+Enter", the DOSBox convention).</summary>
+    public string FullscreenKey { get; set; } = "Alt+Enter";
+
     /// <summary>The CRT video shader applied to games: "Off", "Scanlines", or "Crt".</summary>
     public string VideoShader { get; set; } = "Off";
 

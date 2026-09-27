@@ -63,6 +63,7 @@ public partial class PreferencesWindow : Window
         HotkeyPause.Text = Display(services.Settings.PauseKey, "Pause");
         HotkeyShaderCycle.Text = Display(services.Settings.ShaderCycleKey, "F3");
         HotkeyFps.Text = Display(services.Settings.FpsOverlayKey, "F1");
+        HotkeyFullscreen.Text = Display(services.Settings.FullscreenKey, "Alt+Enter");
 
         VersionText.Text = $"Version {UpdateService.CurrentVersion}";
         CheckUpdatesBox.IsChecked = services.Settings.CheckForUpdates;
@@ -244,16 +245,37 @@ public partial class PreferencesWindow : Window
         e.Handled = true;
         if (e.Key == Key.Escape)
         {
-            box.Text = box == HotkeyMouseLock ? "Middle Mouse"
-                : box == HotkeyRecord ? "F9"
-                : box == HotkeyMenu ? "F10"
-                : box == HotkeySaveState ? "F5"
-                : box == HotkeyLoadState ? "F8"
-                : "F12";
+            box.Text = HotkeyDefault(box);
+            return;
+        }
+        if (box == HotkeyFullscreen)
+        {
+            // A chord: wait for the key that goes with the modifiers, then show it as "Alt+Enter".
+            if (e.Key is Key.LeftAlt or Key.RightAlt or Key.LeftCtrl or Key.RightCtrl or Key.LeftShift
+                or Key.RightShift or Key.LWin or Key.RWin)
+                return;
+            box.Text = new KeyGesture(e.Key, e.KeyModifiers).ToString();
             return;
         }
         box.Text = e.Key.ToString();
     }
+
+    // What Esc resets each box to (the same defaults UserSettings starts with).
+    private string HotkeyDefault(TextBox box) =>
+        box == HotkeyMouseLock ? "Middle Mouse"
+        : box == HotkeyRecord ? "F9"
+        : box == HotkeyMenu ? "F10"
+        : box == HotkeySaveState ? "F5"
+        : box == HotkeyLoadState ? "F8"
+        : box == HotkeyCheat ? "F11"
+        : box == HotkeyFastForward ? "F6"
+        : box == HotkeySlowMotion ? "F7"
+        : box == HotkeyRewind ? "F4"
+        : box == HotkeyPause ? "Pause"
+        : box == HotkeyShaderCycle ? "F3"
+        : box == HotkeyFps ? "F1"
+        : box == HotkeyFullscreen ? "Alt+Enter"
+        : "F12";
 
     private void OnSaveHotkeys(object? sender, RoutedEventArgs e)
     {
@@ -271,6 +293,7 @@ public partial class PreferencesWindow : Window
         s.PauseKey = HotkeyPause.Text!.Trim();
         s.ShaderCycleKey = HotkeyShaderCycle.Text!.Trim();
         s.FpsOverlayKey = HotkeyFps.Text!.Trim();
+        s.FullscreenKey = HotkeyFullscreen.Text!.Trim();
         _services.SettingsStore.Save(s);
         Set(HotkeysStatus, "Saved — applies next launch.", Success);
     }

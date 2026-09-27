@@ -204,6 +204,9 @@
           <TextBox Name="HotkeyShaderCycle" Width="200" HorizontalAlignment="Left" IsReadOnly="True" Cursor="Hand" KeyDown="OnHotkeyCapture"/>
           <TextBlock Text="Toggle FPS overlay" Theme="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
           <TextBox Name="HotkeyFps" Width="200" HorizontalAlignment="Left" IsReadOnly="True" Cursor="Hand" KeyDown="OnHotkeyCapture"/>
+          <TextBlock Text="Fullscreen" Theme="{StaticResource FieldLabel}" Margin="0,12,0,0"/>
+          <TextBox Name="HotkeyFullscreen" Width="200" HorizontalAlignment="Left" IsReadOnly="True" Cursor="Hand" KeyDown="OnHotkeyCapture"/>
+          <TextBlock Theme="{StaticResource Muted}" FontSize="11" Margin="0,4,0,0" Text="Takes a key with modifiers, such as Alt+Enter. Each game remembers whether it was fullscreen."/>
 
           <StackPanel Orientation="Horizontal" Margin="0,18,0,0">
             <Button Content="Save" Click="OnSaveHotkeys" Padding="18,6"/>

@@ -30,6 +30,10 @@ public sealed record GameUserState
     /// user made and the catalog's program.</summary>
     public string? InstalledExecutable { get; init; }
 
+    /// <summary>The game window was fullscreen when last closed; the next launch opens it fullscreen.
+    /// <see cref="WindowWidth"/>/<see cref="WindowHeight"/> keep the windowed size meanwhile.</summary>
+    public bool Fullscreen { get; init; }
+
     /// <summary>Per-game box-art style override. <see cref="BoxStyle.Default"/> follows the global
     /// <c>UserSettings.Use3DBoxes</c> preference; the others force 2D or 3D for this game alone.</summary>
     public BoxStyle BoxStyle { get; init; } = BoxStyle.Default;

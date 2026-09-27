@@ -83,12 +83,21 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
     private Key _fpsKey, _screenshotKey, _recordKey, _menuKey, _saveStateKey, _loadStateKey;
     private Key _cheatKey, _fastForwardKey, _slowMotionKey, _pauseKey, _rewindKey, _shaderCycleKey;
     private Key? _mouseLockKey;
+    private KeyGesture? _fullscreenGesture;
+    private WindowState _windowedState = WindowState.Normal;
+    private (int Width, int Height)? _windowedSize; // the window's size before it went fullscreen
     private readonly HashSet<Key> _heldHotkeys = [];
     private string _desiredPreset = ""; // per-game CRT preset; the renderer lands with the shader phase
 
     private DispatcherTimer? _hintTimer;
 
     private static Key ParseKey(string name, Key fallback) => Enum.TryParse<Key>(name, out var k) ? k : fallback;
+
+    private static KeyGesture? ParseGesture(string text)
+    {
+        try { return string.IsNullOrWhiteSpace(text) ? null : KeyGesture.Parse(text); }
+        catch (Exception ex) when (ex is ArgumentException or FormatException) { return null; }
+    }
 
     public EmulatorWindow(IDosEngine engine, GameInstance instance, long gameId = 0, byte[]? initialState = null)
     {
@@ -116,6 +125,7 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
         _rewindKey = ParseKey(settings.RewindKey, Key.F4);
         _shaderCycleKey = ParseKey(settings.ShaderCycleKey, Key.F3);
         _fpsKey = ParseKey(settings.FpsOverlayKey, Key.F1);
+        _fullscreenGesture = ParseGesture(settings.FullscreenKey) ?? ParseGesture("Alt+Enter");
 
         var state = services.Store.ReadState(instance.GameboxPath);
         _desiredPreset = state.Shader ?? "";
@@ -124,6 +134,9 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
             Width = w;
             Height = h;
         }
+        _windowedSize = state.WindowWidth is int ww && state.WindowHeight is int wh ? (ww, wh) : null;
+        if (state.Fullscreen)
+            WindowState = WindowState.FullScreen; // remembered per game
 
         // Holding fast-forward/slow-motion/rewind across a focus change would otherwise stick; reset it.
         Deactivated += (_, _) =>
@@ -450,6 +463,12 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
         if (effective == Key.V && e.KeyModifiers.HasFlag(KeyModifiers.Control))
         {
             _ = PasteFromClipboardAsync();
+            e.Handled = true;
+            return;
+        }
+        if (_fullscreenGesture is { } fullscreen && fullscreen.Matches(e))
+        {
+            if (firstPress) ToggleFullscreen();
             e.Handled = true;
             return;
         }
@@ -1088,6 +1107,25 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
         _cheatWindow.Show();
     }
 
+    // Borderless fullscreen and back. The X window stays the same one, so a pointer grab confined to it
+    // (the mouse lock) follows it to the new size instead of being released.
+    private void ToggleFullscreen()
+    {
+        if (WindowState == WindowState.FullScreen)
+        {
+            WindowState = _windowedState;
+            ShowHint("Windowed");
+            _log.Info("Fullscreen off");
+            return;
+        }
+        _windowedState = WindowState == WindowState.Maximized ? WindowState.Maximized : WindowState.Normal;
+        if (WindowState == WindowState.Normal)
+            _windowedSize = ((int)Width, (int)Height);
+        WindowState = WindowState.FullScreen;
+        ShowHint($"Fullscreen  —  {_fullscreenGesture} returns to a window", 2.5);
+        _log.Info("Fullscreen on");
+    }
+
     private static string SafeName(string title) =>
         string.Concat(title.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)).Trim();
 
@@ -1134,10 +1172,14 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
         var services = ((App)Application.Current!).Services;
         try
         {
-            var st = services.Store.ReadState(_instance.GameboxPath) with
+            var saved = services.Store.ReadState(_instance.GameboxPath);
+            var fullscreen = WindowState == WindowState.FullScreen;
+            var st = saved with
             {
-                WindowWidth = (int)Width,
-                WindowHeight = (int)Height,
+                // A fullscreen window measures the screen; keep the windowed size for the next launch.
+                WindowWidth = fullscreen ? _windowedSize?.Width ?? saved.WindowWidth : (int)Width,
+                WindowHeight = fullscreen ? _windowedSize?.Height ?? saved.WindowHeight : (int)Height,
+                Fullscreen = fullscreen,
             };
             if (CapturedLaunch() is { } captured)
                 st = st with { LastRunProgram = captured };
