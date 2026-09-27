@@ -19,7 +19,6 @@ public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileRe
     private static readonly string[] ArchiveExtensions = [".zip", ".rar", ".7z"];
     private static readonly string[] DiscImageExtensions = [".iso", ".cue", ".bin", ".chd"];
     private static readonly string[] ExecutableExtensions = [".exe", ".com", ".bat"];
-    private static readonly string[] InstallerStems = ["install", "setup", "inst", "instalar"];
 
     public async Task<ImportResult> ImportAsync(
         string sourcePath,
@@ -125,7 +124,7 @@ public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileRe
                 }
                 else
                 {
-                    (classification, chosen) = Classify(executables, title);
+                    (classification, chosen) = ExecutableGuesser.Guess(executables, title, box.ContentDir);
                     // Follow a hardcoded-path launcher .bat to the real exe (eXoDOS-style shims that
                     // assume a fixed install path which breaks once imported into a subfolder).
                     if (chosen is not null)
@@ -307,9 +306,7 @@ public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileRe
         string? gameboxPath = null;
         try
         {
-            var title = StripDiscMarker(Path.GetFileNameWithoutExtension(discPaths[0]));
-            if (string.IsNullOrWhiteSpace(title))
-                title = "Untitled";
+            var title = TitleCleaner.Clean(StripDiscMarker(Path.GetFileNameWithoutExtension(discPaths[0])));
 
             gameboxPath = AllocateGameboxPath(title);
             var box = new Gamebox(gameboxPath);
@@ -329,6 +326,7 @@ public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileRe
                 Success = true,
                 GameboxPath = gameboxPath,
                 Classification = ImportClassification.NeedsInstall,
+                Title = title,
             };
         }
         catch (Exception ex)
@@ -359,7 +357,7 @@ public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileRe
         var name = Directory.Exists(sourcePath)
             ? new DirectoryInfo(sourcePath).Name
             : Path.GetFileNameWithoutExtension(sourcePath);
-        return string.IsNullOrWhiteSpace(name) ? "Untitled" : name;
+        return TitleCleaner.Clean(name);
     }
 
     private string AllocateGameboxPath(string title)
@@ -549,52 +547,10 @@ public sealed class ImportPipeline(AppPaths paths, GameboxStore store, ProfileRe
         return destName;
     }
 
-    /// <summary>The executable heuristics alone: classify <paramref name="executables"/> (content-relative
-    /// DOS paths) and pick the program to run, as import does before the catalog is consulted.</summary>
+    /// <summary>The executable heuristics alone (see <see cref="ExecutableGuesser"/>), as import applies
+    /// them before the catalog is consulted. Without a content folder, file sizes are unknown.</summary>
     public static (ImportClassification Classification, string? Executable) GuessExecutable(
-        IReadOnlyList<string> executables, string title) => Classify([.. executables], title);
-
-    private static (ImportClassification, string?) Classify(List<string> executables, string title)
-    {
-        // A DOS extender means the real launcher is almost always a .bat that invokes it.
-        bool hasExtender = executables.Any(DosExecutables.IsExtender);
-        var launchable = executables.Where(e => !DosExecutables.IsRuntimeHelper(e)).ToList();
-
-        var games = launchable.Where(e => !IsInstaller(e)).ToList();
-        if (games.Count > 0)
-            return (ImportClassification.ReadyToPlay, PickBest(games, title, hasExtender));
-
-        var installers = launchable.Where(IsInstaller).ToList();
-        if (installers.Count > 0)
-            return (ImportClassification.NeedsInstall, PickBest(installers, title, hasExtender));
-
-        return (ImportClassification.Unknown, launchable.FirstOrDefault() ?? executables.FirstOrDefault());
-    }
-
-    private static bool IsInstaller(string relativePath) =>
-        InstallerStems.Contains(Path.GetFileNameWithoutExtension(relativePath).ToLowerInvariant());
-
-    private static string PickBest(List<string> candidates, string title, bool preferBat)
-    {
-        var titled = candidates.FirstOrDefault(c => DosExecutables.TitleMatches(c, title));
-        if (titled is not null)
-            return titled;
-
-        // A canonical launcher (SIERRA.EXE, RUN.BAT, …) beats the generic guesses below — Sierra
-        // games have no title-named exe and would otherwise fall to the largest/first executable.
-        var known = candidates.FirstOrDefault(DosExecutables.IsKnownLauncher);
-        if (known is not null)
-            return known;
-
-        // Extender-based game (e.g. DOS/4GW): the launcher batch is the right target, not the raw exe.
-        if (preferBat
-            && candidates.FirstOrDefault(c => c.EndsWith(".bat", StringComparison.OrdinalIgnoreCase)) is { } bat)
-            return bat;
-
-        // Prefer a real .exe over a bundled utility (patcher, prep wizard, …) when guessing.
-        var exes = candidates.Where(c => c.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)).ToList();
-        return exes.FirstOrDefault(c => !DosExecutables.IsLikelyUtility(c))
-            ?? exes.FirstOrDefault()
-            ?? candidates[0];
-    }
+        IReadOnlyList<string> executables, string title, string? contentDir = null,
+        IReadOnlyDictionary<string, long>? sizes = null) =>
+        ExecutableGuesser.Guess(executables, title, contentDir, sizes);
 }

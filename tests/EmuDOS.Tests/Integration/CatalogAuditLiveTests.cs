@@ -38,13 +38,23 @@ public class CatalogAuditLiveTests
             if (!isDir && !ArchiveExtensions.Contains(Path.GetExtension(item).ToLowerInvariant()))
                 continue;
             List<string> paths;
+            Dictionary<string, long>? sizes = null;
             try
             {
-                paths = isDir
-                    ? Directory.EnumerateFiles(item, "*", SearchOption.AllDirectories)
-                        .Select(f => Path.GetRelativePath(item, f).Replace('/', '\\')).ToList()
-                    : ArchiveFactory.OpenArchive(item).Entries.Where(e => !e.IsDirectory && e.Key is not null)
-                        .Select(e => e.Key!.Replace('/', '\\')).ToList();
+                if (isDir)
+                {
+                    paths = Directory.EnumerateFiles(item, "*", SearchOption.AllDirectories)
+                        .Select(f => Path.GetRelativePath(item, f).Replace('/', '\\')).ToList();
+                }
+                else
+                {
+                    var entries = ArchiveFactory.OpenArchive(item).Entries
+                        .Where(e => !e.IsDirectory && e.Key is not null).ToList();
+                    paths = entries.Select(e => e.Key!.Replace('/', '\\')).ToList();
+                    sizes = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var e in entries)
+                        sizes[e.Key!.Replace('/', '\\')] = e.Size;
+                }
             }
             catch (Exception ex)
             {
@@ -55,7 +65,7 @@ public class CatalogAuditLiveTests
             var title = ImportPipeline.DeriveTitle(item);
             var exes = paths.Where(p => ExecutableExtensions.Contains(Path.GetExtension(p).ToLowerInvariant()))
                 .OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList();
-            var (cls, guess) = ImportPipeline.GuessExecutable(exes, title);
+            var (cls, guess) = ImportPipeline.GuessExecutable(exes, title, isDir ? item : null, sizes);
             var resolution = resolver.Resolve(new GameProfile { Title = title, Launch = new LaunchSpec { Executable = guess } }, paths);
             rows.Add(string.Join('\t', Path.GetFileName(item), title, cls, guess ?? "-",
                 resolution.Recognized ? "yes" : "no", resolution.Executable ?? "-",

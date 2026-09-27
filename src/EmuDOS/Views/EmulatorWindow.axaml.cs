@@ -312,8 +312,7 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
                                   && Path.GetFileNameWithoutExtension(f).Equals(_lastLaunch, StringComparison.OrdinalIgnoreCase));
             if (match is null || Core.Import.DosExecutables.IsRuntimeHelper(match))
                 return null;
-            var n = Path.GetFileNameWithoutExtension(match).ToLowerInvariant();
-            if (n.Contains("setup") || n.Contains("install") || n.Contains("config"))
+            if (Core.Import.DosExecutables.IsSetupLike(match))
                 return null;
             return Path.GetRelativePath(_instance.ContentPath, match).Replace('/', '\\');
         }

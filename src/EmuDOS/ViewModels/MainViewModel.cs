@@ -373,8 +373,8 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         bool hadError = false;
-        string? installHint = null;
-        string? warning = null;
+        var imported = new List<Core.Import.ImportResult>();
+        string? discSetHint = null;
 
         foreach (var set in discSets)
         {
@@ -383,7 +383,8 @@ public sealed partial class MainViewModel : ObservableObject
             if (result.Success && result.GameboxPath is not null)
             {
                 _services.Library.UpsertFromGamebox(result.GameboxPath);
-                installHint = $"Imported a {set.Count}-disc game — open it to install, swapping discs from the in-game menu.";
+                imported.Add(result);
+                discSetHint = $"Imported {result.Title} ({set.Count} discs) — open it to install, swapping discs from the in-game menu.";
             }
             else
             {
@@ -401,10 +402,8 @@ public sealed partial class MainViewModel : ObservableObject
             if (result.Success && result.GameboxPath is not null)
             {
                 _services.Library.UpsertFromGamebox(result.GameboxPath);
-                if (result.Warning is not null)
-                    warning = result.Warning;
-                else if (result.Classification == Core.Import.ImportClassification.NeedsInstall)
-                    installHint = $"Imported {name} — open it to install (the disc is mounted as D:).";
+                imported.Add(result);
+                _services.SystemLog.Info($"Imported [{path}]: {Core.Import.ImportSummary.Describe(result)}");
             }
             else
             {
@@ -422,14 +421,21 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        if (warning is not null)
-            Report(warning, busy: false);
-        else if (installHint is not null)
-            Report(installHint, busy: false);
+        // What import made of each game: recognised by the catalog, or which program it guessed —
+        // so the user knows when Choose program… is needed.
+        var summary = imported.Count == 1 && discSetHint is not null ? discSetHint
+            : imported.Count > 0 ? Core.Import.ImportSummary.Describe(imported)
+            : null;
+        if (summary is not null)
+            Report(summary, busy: false);
         else
             ClearStatus();
 
         await FetchMissingArtAsync();
+
+        // The art sweep reports its own progress and clears the bar; put the import summary back.
+        if (summary is not null)
+            Report(summary, busy: false);
     }
 
     public bool HasSelection => Games.Any(g => g.IsSelected);

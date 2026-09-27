@@ -39,11 +39,7 @@ public partial class ChooseProgramDialog : Window
             Close(item.Path);
     }
 
-    private static bool IsSetupLike(string executable)
-    {
-        var name = Path.GetFileNameWithoutExtension(executable).ToLowerInvariant();
-        return name.Contains("setup") || name.Contains("install") || name.Contains("config");
-    }
+    private static bool IsSetupLike(string executable) => Core.Import.DosExecutables.IsSetupLike(executable);
 
     private sealed record ExeItem(string Path, bool IsSetup)
     {

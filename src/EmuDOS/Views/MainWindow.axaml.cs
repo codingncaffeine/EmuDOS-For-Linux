@@ -646,11 +646,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>A configuration/installer program, not the game — shouldn't become the default launch.</summary>
-    private static bool IsSetupLike(string executable)
-    {
-        var name = Path.GetFileNameWithoutExtension(executable).ToLowerInvariant();
-        return name.Contains("setup") || name.Contains("install") || name.Contains("config");
-    }
+    private static bool IsSetupLike(string executable) => Core.Import.DosExecutables.IsSetupLike(executable);
 
     /// <summary>DOS-relative paths of runnable files under the content (minus the DOSBox wrapper).</summary>
     private static List<string> ScanExecutables(string contentDir)
@@ -673,37 +669,15 @@ public partial class MainWindow : Window
         return found;
     }
 
-    /// <summary>The most likely game program among the content's executables — a name matching the
-    /// title, then a known launcher, then the largest exe — skipping installers and setup tools.</summary>
+    /// <summary>The most likely game program in the content — the same guesser import uses (title,
+    /// known launcher, extender batch, largest program; installers and tools skipped) — or null when
+    /// the content holds no game yet (only an installer, or nothing runnable).</summary>
     private static string? BestGameExecutable(string contentDir, string title)
     {
-        var pick = BestGameExecutableCore(contentDir, title);
-        return pick is null ? null : Core.Import.DosExecutables.ResolveBatRedirect(contentDir, pick);
-    }
-
-    private static string? BestGameExecutableCore(string contentDir, string title)
-    {
-        var candidates = ScanExecutables(contentDir)
-            .Where(e => !IsSetupLike(e) && !Core.Import.DosExecutables.IsRuntimeHelper(e))
-            .ToList();
-        if (candidates.Count == 0)
-            return null;
-
-        var titled = candidates.FirstOrDefault(e => Core.Import.DosExecutables.TitleMatches(e, title));
-        if (titled is not null)
-            return titled;
-
-        var known = candidates.FirstOrDefault(Core.Import.DosExecutables.IsKnownLauncher);
-        if (known is not null)
-            return known;
-
-        static long Size(string p) { try { return new FileInfo(p).Length; } catch { return 0; } }
-        var best = candidates
-            .Select(e => (exe: e, size: Size(Path.Combine(contentDir, e)), util: Core.Import.DosExecutables.IsLikelyUtility(e)))
-            .OrderBy(x => x.util)
-            .ThenByDescending(x => x.size)
-            .FirstOrDefault();
-        return best.size > 0 ? best.exe : (candidates.FirstOrDefault(e => e.Contains('\\')) ?? candidates[0]);
+        var (classification, pick) = Core.Import.ExecutableGuesser.Guess(ScanExecutables(contentDir), title, contentDir);
+        return classification == Core.Import.ImportClassification.ReadyToPlay && pick is not null
+            ? Core.Import.DosExecutables.ResolveBatRedirect(contentDir, pick)
+            : null;
     }
 
     private static List<string> OrderedExecutables(GameUserState state, List<string> scanned)
