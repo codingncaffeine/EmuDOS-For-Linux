@@ -377,6 +377,23 @@ public sealed class DosBoxPureSession : IDosSession
         _rewindBytes = 0;
     }
 
+    // Dev hook (EMUDOS_MOUSETRACE=1): log what the core is actually fed for the mouse — the latched
+    // per-frame deltas and their running totals — so a host's mouse path can be verified at the
+    // libretro boundary without eyes. Off by default; a summary line every 35 frames (~0.5 s).
+    private static readonly bool MouseTrace = Environment.GetEnvironmentVariable("EMUDOS_MOUSETRACE") == "1";
+    private long _traceFrames, _traceSumX, _traceSumY, _traceNonZero;
+
+    private void TraceMouse()
+    {
+        _traceFrames++;
+        _traceSumX += _mouse.X;
+        _traceSumY += _mouse.Y;
+        if (_mouse.X != 0 || _mouse.Y != 0)
+            _traceNonZero++;
+        if (_traceFrames % 35 == 0)
+            _host.OnCoreLog(1, $"[mousetrace] frames={_traceFrames} sumX={_traceSumX} sumY={_traceSumY} nonzero={_traceNonZero} L={_mouse.Left} R={_mouse.Right}");
+    }
+
     // Runs on the core thread, once per frame, before input is read: latch the mouse and push
     // any queued key transitions into the core's keyboard callback.
     private const int MinKeyHoldFrames = 4;
@@ -390,6 +407,8 @@ public sealed class DosBoxPureSession : IDosSession
     {
         _gamepad.Poll(); // latch a controller snapshot once per frame (read by QueryInput's joypad case)
         _mouse = _host.Input.PollMouse();
+        if (MouseTrace)
+            TraceMouse();
 
         while (_host.Input.TryDequeueKey(out var key))
         {

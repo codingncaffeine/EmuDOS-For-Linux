@@ -67,6 +67,7 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
     private double _sensitivity = MouseSensitivity;
     private bool _mouseLeft, _mouseRight;
     private bool _mouseLocked;
+    private X11MouseLock? _x11Lock; // created on first lock; null = no X11 (bounded deltas only)
     private Point? _lastPointer;
     private bool _capsLock;
     private volatile bool _menuHeld; // mapped to the gamepad L3 button, which opens dosbox's disc menu
@@ -522,25 +523,13 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
     {
         var p = e.GetPosition(this);
 
-        // Locked + X11 available: feed motion relative to the window centre, then warp the cursor
-        // back there so it never reaches a screen edge — giving the game unbounded relative motion.
-        if (_mouseLocked && Platform.X11Pointer.Available)
-        {
-            var center = new Point(Bounds.Width / 2, Bounds.Height / 2);
-            double dx = p.X - center.X, dy = p.Y - center.Y;
-            if (dx != 0 || dy != 0)
-            {
-                lock (_inputLock)
-                {
-                    _mouseAccumX += dx * _sensitivity;
-                    _mouseAccumY += dy * _sensitivity;
-                }
-                var screenCenter = this.PointToScreen(center);
-                Platform.X11Pointer.WarpTo(screenCenter.X, screenCenter.Y);
-            }
+        // Locked with the X11 grab engaged: the game is fed raw device motion on the input thread
+        // (OnRawDelta) and the pointer never reaches us — ignore anything the toolkit reports.
+        if (_mouseLocked && _x11Lock?.IsActive == true)
             return;
-        }
 
+        // Unlocked, or locked without an X11 grab (no X11 at all, or the grab was refused): bounded
+        // window-relative deltas.
         if (_lastPointer is { } last)
         {
             lock (_inputLock)
@@ -572,9 +561,16 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
     // DOS games don't read the wheel, so it's free for adjusting mouse sensitivity (matches Windows).
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
-        _sensitivity = Math.Clamp(_sensitivity + (e.Delta.Y > 0 ? 0.25 : -0.25), 0.25, 6.0);
-        ShowHint($"Mouse sensitivity {_sensitivity:0.00}×");
+        AdjustSensitivity(e.Delta.Y > 0 ? 0.25 : -0.25);
         e.Handled = true;
+    }
+
+    private void AdjustSensitivity(double step)
+    {
+        double now;
+        lock (_inputLock) // read on the input thread by OnRawDelta
+            now = _sensitivity = Math.Clamp(_sensitivity + step, 0.25, 6.0);
+        ShowHint($"Mouse sensitivity {now:0.00}×");
     }
 
     private void UpdateButtons(PointerEventArgs e)
@@ -587,20 +583,62 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
         }
     }
 
+    // Mouse lock = the Windows build's raw-input capture, done the Linux way (see X11MouseLock): raw
+    // XInput2 motion feeds the game, the pointer is grabbed + confined to this window, the cursor is
+    // hidden. Works on Xorg and under Xwayland on every major compositor. Without X11 (or if the
+    // grab is refused) the cursor is still hidden and the game gets bounded window-relative deltas.
     private void ToggleMouseLock()
     {
         _mouseLocked = !_mouseLocked;
-        // Hide the cursor while locked. On X11 (incl. Xwayland) we also warp the pointer to the window
-        // centre on each move (see OnPointerMoved) so the game gets unbounded relative motion — no more
-        // clamping at the screen edge. Pure-Wayland with no Xwayland falls back to bounded deltas.
         Cursor = new Cursor(_mouseLocked ? StandardCursorType.None : StandardCursorType.Arrow);
-        if (_mouseLocked && Platform.X11Pointer.Available)
-        {
-            var center = new Point(Bounds.Width / 2, Bounds.Height / 2);
-            Platform.X11Pointer.WarpTo(this.PointToScreen(center).X, this.PointToScreen(center).Y);
-        }
         _lastPointer = null; // forget the pre-lock position so the next move isn't a giant jump
+        if (_mouseLocked)
+        {
+            _x11Lock ??= new X11MouseLock(OnRawDelta, OnGrabbedButton, OnLockActiveChanged, _log.Info);
+            if (TryGetPlatformHandle() is { HandleDescriptor: "XID" } handle)
+                _x11Lock.Lock(handle.Handle);
+            else
+                _log.Info("Mouse lock: no X11 window handle — using bounded pointer deltas");
+        }
+        else
+        {
+            _x11Lock?.Unlock();
+        }
         ShowHint(_mouseLocked ? "Mouse locked — middle-click to release" : "Mouse unlocked");
+    }
+
+    // ── X11MouseLock callbacks — all on the input thread, never the UI thread ─────────────────
+    private void OnRawDelta(double dx, double dy)
+    {
+        lock (_inputLock)
+        {
+            _mouseAccumX += dx * _sensitivity;
+            _mouseAccumY += dy * _sensitivity;
+        }
+    }
+
+    // While grabbed, button events bypass the toolkit and arrive here (X numbering: 1 left, 2 middle,
+    // 3 right, 4/5 wheel up/down).
+    private void OnGrabbedButton(int button, bool pressed)
+    {
+        switch (button)
+        {
+            case 1: lock (_inputLock) _mouseLeft = pressed; break;
+            case 3: lock (_inputLock) _mouseRight = pressed; break;
+            case 2:
+                if (pressed) Dispatcher.UIThread.Post(() => { if (_mouseLocked) ToggleMouseLock(); });
+                break;
+            case 4 or 5:
+                if (pressed) Dispatcher.UIThread.Post(() => AdjustSensitivity(button == 4 ? 0.25 : -0.25));
+                break;
+        }
+    }
+
+    private void OnLockActiveChanged(bool active)
+    {
+        _log.Info(active ? "Mouse lock engaged (X11 raw input + pointer grab)" : "Mouse lock released");
+        if (!active && _mouseLocked) // still locked from the user's point of view, but without a grab
+            Dispatcher.UIThread.Post(() => ShowHint("Mouse lock is limited on this display — middle-click to release", 2.2));
     }
 
     private static ushort Modifiers(KeyModifiers m)
@@ -969,6 +1007,10 @@ public partial class EmulatorWindow : Window, IEngineHost, IInputSource
 
     private void OnClosing(object? sender, EventArgs e)
     {
+        // Release the pointer grab and show the cursor while the X window still exists.
+        _mouseLocked = false;
+        try { _x11Lock?.Dispose(); } catch { }
+        _x11Lock = null;
         _fpsTimer?.Stop();
         _hintTimer?.Stop();
         _lcdTimer?.Stop();
