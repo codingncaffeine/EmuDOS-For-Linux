@@ -13,6 +13,8 @@ A native **Linux** port of [EmuDOS](https://github.com/codingncaffeine/EmuDOS) â
 on a shelf: art downloaded automatically, sensible settings applied for you, and Roland MT-32 music
 (with a working LCD) when you supply the ROMs.
 
+**Website:** [codingncaffeine.github.io/EmuDOS](https://codingncaffeine.github.io/EmuDOS/)
+
 The original is Windows/WPF/.NET 10; this port is rebuilt on **.NET 10 + Avalonia**. The goal is a
 **1:1 clone** â€” aesthetically and functionally identical to the Windows app, with only the platform
 plumbing swapped underneath:
